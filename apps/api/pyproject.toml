@@ -18,6 +18,10 @@ dev = [
     "httpx>=0.27,<1",               #supports API testing
     "ruff>=0.9",                    #check code quality and types
     "mypy>=1.14",                   #same as ruff
+    "sqlalchemy>=2.0,<3",           #db access and session management
+    "psycopg[binary]>=3.2,<4",      #PostgreSQL driver used by SQLAlchemy
+    "python-dotenv>=1.0,<2",
+    "alembic>=1.14,<2",             #migration tool for SQLAlchemy
 ]
 
 [tool.setuptools.packages.find]
@@ -31,5 +35,6 @@ line-length = 88
 target-version = "py311"
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.11"
 strict = true
+

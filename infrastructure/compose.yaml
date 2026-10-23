@@ -1,0 +1,30 @@
+
+services:
+  postgres:
+    # PostgreSQL database for local development.
+    image: postgres:17
+    container_name: optometry-postgres
+
+    environment:
+      # Local development credentials only.
+      POSTGRES_USER: optometry
+      POSTGRES_PASSWORD: local_dev_password
+      POSTGRES_DB: optometry_booking
+
+    ports:
+      # Accessible only from your own computer.
+      - "127.0.0.1:5432:5432"
+
+    volumes:
+      # Keeps data when the container is restarted.
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      # Checks whether the database accepts connections.
+      test: ["CMD-SHELL", "pg_isready -U optometry -d optometry_booking"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
