@@ -1,0 +1,21 @@
+
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+}
+
+.welcome-card {
+  max-width: 600px;
+  text-align: center;
+}
+
+.welcome-card h1 {
+  font-size: 2.5rem;
+}
+
+.welcome-card p {
+  color: #64748b;
+}
