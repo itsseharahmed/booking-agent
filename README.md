@@ -135,6 +135,126 @@ Open:
 
 http://localhost:5173
 
+## Database Setup 
+
+The backend uses **PostgreSQL 17** for persistent storage, **SQLAlchemy 2** for database access, and **Alembic** for schema migrations.
+
+PostgreSQL runs locally using Docker Desktop.
+
+### Prerequisites
+
+- Python 3.11 or later
+- Docker Desktop with the Docker engine running
+- Backend Python virtual environment configured
+
+### 1. Start PostgreSQL
+
+From the project root:
+
+```powershell
+docker compose -f infrastructure/compose.yaml up -d
+```
+
+Verify the database container is healthy:
+
+```powershell
+docker compose -f infrastructure/compose.yaml ps
+```
+
+### 2. Configure environment variables
+
+Create a `.env` file in the project root using `.env.example` as a reference.
+
+Configure:
+
+```dotenv
+DATABASE_URL=postgresql+psycopg://optometry:<development-password>@127.0.0.1:5432/optometry_booking
+TEST_DATABASE_URL=postgresql+psycopg://optometry:<test-password>@127.0.0.1:5432/optometry_booking_test
+```
+
+Replace the placeholders with your local development credentials. The current Docker configuration uses the same development user for both databases.
+
+**Never commit `.env` or real credentials.**
+
+### 3. Install backend dependencies
+
+From `apps/api`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
+
+### 4. Apply database migrations
+
+```powershell
+.\.venv\Scripts\python.exe -m alembic upgrade head
+```
+
+Verify the migration version:
+
+```powershell
+.\.venv\Scripts\python.exe -m alembic current
+```
+
+### 5. Prepare the test database
+
+Create the dedicated test database once:
+
+```powershell
+docker exec optometry-postgres psql -U optometry -d postgres -c "CREATE DATABASE optometry_booking_test;"
+```
+
+If it already exists, skip this command.
+
+Apply migrations to the test database using a temporary environment override:
+
+```powershell
+$previousUrl = $env:DATABASE_URL
+
+try {
+    $env:DATABASE_URL = $env:TEST_DATABASE_URL
+    .\.venv\Scripts\python.exe -m alembic upgrade head
+}
+finally {
+    if ($null -eq $previousUrl) {
+        Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:DATABASE_URL = $previousUrl
+    }
+}
+```
+
+### 6. Run backend tests and checks
+
+From `apps/api`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m ruff format --check .
+.\.venv\Scripts\python.exe -m mypy src
+```
+
+The integration tests use a dedicated PostgreSQL test database and validate its identity before running database operations.
+
+### Database Architecture
+
+- `infrastructure/compose.yaml` — PostgreSQL Docker configuration
+- `apps/api/src/optometry/core/config.py` — Environment configuration
+- `apps/api/src/optometry/db/base.py` — SQLAlchemy declarative base
+- `apps/api/src/optometry/db/session.py` — Database engine and session factory
+- `apps/api/migrations/` — Version-controlled Alembic migrations
+- `apps/api/tests/integration/` — PostgreSQL integration tests
+
+### Development Notes
+
+- Docker volumes preserve database data between container restarts.
+- Database schema changes must be managed through Alembic migrations.
+- Development and test databases must remain separate.
+- Only synthetic test data should be used during development.
+- The initial `schema_check` table verifies migration functionality; actual clinic and appointment models will be introduced in later increments.
+
 ## Running Tests
 
 ### Backend tests
