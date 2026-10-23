@@ -29,7 +29,7 @@ The database, booking engine, and AI features have not been implemented yet.
 ## Project Structure
 
 ```text
-optometry-booking-agent/
+booking-agent/
 ├── apps/
 │   ├── api/
 │   │   ├── src/
@@ -72,11 +72,10 @@ Install the following tools:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/optometry-booking-agent.git
-cd optometry-booking-agent
+git clone https://github.com/itsseharahmed/booking-agent.git
+cd booking-agent
 ```
 
-Replace `YOUR_USERNAME` with your GitHub username.
 
 ### 2. Set up the backend
 
