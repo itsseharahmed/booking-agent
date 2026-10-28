@@ -48,14 +48,29 @@ def test_engine() -> Generator[Engine, None, None]:
 
 @pytest.fixture
 def test_session(test_engine: Engine) -> Generator[Session, None, None]:
-    """Provide a session connected exclusively to the test database."""
+    """Provide a session whose changes are rolled back after each test."""
 
+    # Open a dedicated connection for this test.
+    connection = test_engine.connect()
+
+    # Begin an outer transaction that the application cannot commit.
+    transaction = connection.begin()
+
+    # SQLAlchemy creates savepoints for session-level transactions.
     session_factory = sessionmaker(
-        bind=test_engine,
+        bind=connection,
         autoflush=False,
         expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
     )
 
-    with session_factory() as session:
+    session = session_factory()
+
+    try:
         yield session
-        session.rollback()
+    finally:
+        session.close()
+
+        # Undo all changes, including changes committed by API endpoints.
+        transaction.rollback()
+        connection.close()

@@ -309,7 +309,6 @@ Verify the production build:
 npm run build
 ```
 
-## Environment Variables
 
 The `.env.example` file documents configuration variables for current and future services.
 
