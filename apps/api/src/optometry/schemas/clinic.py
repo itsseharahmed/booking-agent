@@ -1,6 +1,7 @@
 """Pydantic schemas for clinic API requests and responses."""
 
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -17,6 +18,12 @@ class ClinicCreate(BaseModel):
     country: str = Field(default="CA", min_length=2, max_length=2)
     phone: str | None = Field(default=None, max_length=30)
     timezone: str = Field(default="America/Toronto")
+    appointment_price: Decimal = Field(
+        default=Decimal("0.00"),
+        ge=0,
+        max_digits=10,
+        decimal_places=2,
+    )
 
     @field_validator("timezone")
     @classmethod
@@ -63,3 +70,14 @@ class ClinicRead(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    appointment_price: Decimal
+
+
+class ClinicAppointmentPriceUpdate(BaseModel):
+    """Update a clinic's standard appointment price."""
+
+    appointment_price: Decimal = Field(
+        ge=0,
+        max_digits=10,
+        decimal_places=2,
+    )

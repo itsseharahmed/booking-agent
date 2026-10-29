@@ -8,7 +8,11 @@ from sqlalchemy.orm import Session
 
 from optometry.db.models.clinic import Clinic
 from optometry.db.session import get_db
-from optometry.schemas.clinic import ClinicCreate, ClinicRead
+from optometry.schemas.clinic import (
+    ClinicAppointmentPriceUpdate,
+    ClinicCreate,
+    ClinicRead,
+)
 
 router = APIRouter(prefix="/clinics", tags=["Clinics"])
 
@@ -61,5 +65,31 @@ def get_clinic(clinic_id: int, db: DatabaseSession) -> Clinic:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Clinic not found",
         )
+
+    return clinic
+
+
+@router.patch(
+    "/{clinic_id}/appointment-price",
+    response_model=ClinicRead,
+)
+def update_clinic_appointment_price(
+    clinic_id: int,
+    payload: ClinicAppointmentPriceUpdate,
+    db: Annotated[Session, Depends(get_db)],
+) -> Clinic:
+    """Update the standard price for every appointment at a clinic."""
+
+    clinic = db.get(Clinic, clinic_id)
+
+    if clinic is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Clinic not found",
+        )
+
+    clinic.appointment_price = payload.appointment_price
+    db.commit()
+    db.refresh(clinic)
 
     return clinic

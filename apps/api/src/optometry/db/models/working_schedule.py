@@ -6,8 +6,10 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     ForeignKeyConstraint,
+    Index,
     Integer,
     Time,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -37,6 +39,14 @@ class WorkingSchedule(Base):
         CheckConstraint(
             "start_time < end_time",
             name="ck_working_schedules_time_order",
+        ),
+        Index(
+            "uq_working_schedules_active_clinic_day",
+            "optometrist_id",
+            "clinic_id",
+            "day_of_week",
+            unique=True,
+            postgresql_where=text("is_active = true"),
         ),
     )
 

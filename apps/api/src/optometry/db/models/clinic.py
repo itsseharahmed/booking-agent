@@ -1,8 +1,9 @@
 """SQLAlchemy model for optometry clinic locations."""
 
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from optometry.db.base import Base
@@ -12,7 +13,16 @@ class Clinic(Base):
     """Represent a physical clinic where appointments can be booked."""
 
     __tablename__ = "clinics"
-
+    __table_args__ = (
+        CheckConstraint(
+            "appointment_price >= 0",
+            name="ck_clinics_nonnegative_appointment_price",
+        ),
+        CheckConstraint(
+            "appointment_price >= 0",
+            name="ck_clinics_nonnegative_appointment_price",
+        ),
+    )
     # Unique identifier for each clinic.
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -45,4 +55,9 @@ class Clinic(Base):
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
+    )
+    appointment_price: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
+        nullable=False,
+        server_default="0.00",
     )
