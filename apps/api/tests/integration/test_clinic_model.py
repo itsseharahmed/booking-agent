@@ -1,7 +1,9 @@
 """Integration tests for the Clinic database model."""
 
+import pytest
 from sqlalchemy import inspect, select
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from optometry.db.models.clinic import Clinic
@@ -83,3 +85,24 @@ def test_retrieve_clinic(test_session: Session) -> None:
     assert saved_clinic.id == clinic.id
     assert saved_clinic.name == "North York Vision Clinic"
     assert saved_clinic.city == "Toronto"
+
+
+def test_database_rejects_non_toronto_timezone(
+    test_session: Session,
+) -> None:
+    """PostgreSQL must reject clinics outside America/Toronto."""
+
+    clinic = Clinic(
+        name="Unsupported Timezone Clinic",
+        address_line1="123 Main Street",
+        city="Toronto",
+        province="Ontario",
+        postal_code="M5V 2T6",
+        country="CA",
+        timezone="America/Vancouver",
+    )
+
+    test_session.add(clinic)
+
+    with pytest.raises(IntegrityError):
+        test_session.flush()

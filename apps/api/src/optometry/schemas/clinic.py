@@ -1,7 +1,6 @@
 """Pydantic schemas for clinic API requests and responses."""
 
 from datetime import datetime
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -22,11 +21,9 @@ class ClinicCreate(BaseModel):
     @field_validator("timezone")
     @classmethod
     def validate_timezone(cls, value: str) -> str:
-        """Ensure the timezone is recognized by the IANA database."""
-        try:
-            ZoneInfo(value)
-        except (ZoneInfoNotFoundError, ValueError) as exc:
-            raise ValueError("Invalid IANA timezone") from exc
+        """Require the same timezone for all clinic locations."""
+        if value != "America/Toronto":
+            raise ValueError("Clinic timezone must be America/Toronto")
 
         return value
 
