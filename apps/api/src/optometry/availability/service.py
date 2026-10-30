@@ -1,13 +1,18 @@
 """Database-backed appointment availability lookup."""
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from optometry.availability.engine import AvailabilitySlot, generate_slots
+from optometry.availability.engine import (
+    AvailabilitySlot,
+    exclude_occupied_slots,
+    generate_slots,
+)
+from optometry.db.models.appointment import Appointment
 from optometry.db.models.appointment_service import AppointmentService
 from optometry.db.models.clinic import Clinic
 from optometry.db.models.optometrist import Optometrist
@@ -75,5 +80,30 @@ def get_availability(
         shift_end=schedule.end_time,
         now=now,
     )
+
+    if not slots:
+        return clinic.appointment_price, slots
+
+    window_start = min(slot.start for slot in slots).astimezone(UTC)
+    window_end = max(slot.end for slot in slots).astimezone(UTC)
+
+    booked_appointments = db.scalars(
+        select(Appointment).where(
+            Appointment.optometrist_id == optometrist_id,
+            Appointment.status == "booked",
+            Appointment.start_at < window_end,
+            Appointment.end_at > window_start,
+        )
+    ).all()
+
+    occupied = [
+        AvailabilitySlot(
+            start=appointment.start_at,
+            end=appointment.end_at,
+        )
+        for appointment in booked_appointments
+    ]
+
+    slots = exclude_occupied_slots(slots, occupied)
 
     return clinic.appointment_price, slots

@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, pool
 
 from optometry.core.config import get_database_url
 from optometry.db.base import Base
+from optometry.db.models.appointment import Appointment  # noqa: F401
 from optometry.db.models.appointment_service import AppointmentService  # noqa: F401
 from optometry.db.models.clinic import Clinic  # noqa: F401
 from optometry.db.models.optometrist import Optometrist  # noqa: F401
