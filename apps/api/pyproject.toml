@@ -22,6 +22,9 @@ dev = [
     "psycopg[binary]>=3.2,<4",      #PostgreSQL driver used by SQLAlchemy
     "python-dotenv>=1.0,<2",
     "alembic>=1.14,<2",             #migration tool for SQLAlchemy
+    "pwdlib[argon2]",               #password hashing
+    "PyJWT>=2.10,<3",               #access tokens
+    "email-validator>=2,<3",
 ]
 
 [tool.setuptools.packages.find]

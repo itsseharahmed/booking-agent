@@ -119,3 +119,8 @@ class Appointment(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+    patient_id: Mapped[int | None] = mapped_column(
+        ForeignKey("patients.id", name="fk_appointments_patient_id"),
+        nullable=True,
+    )

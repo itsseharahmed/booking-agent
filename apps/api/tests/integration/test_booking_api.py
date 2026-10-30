@@ -9,16 +9,38 @@ from fastapi.testclient import TestClient
 
 from optometry.api.appointments import router as appointments_router
 from optometry.api.availability import router as availability_router
+from optometry.core.security import create_access_token, hash_password
+from optometry.db.models.appointment import Appointment
 from optometry.db.models.appointment_service import AppointmentService
 from optometry.db.models.clinic import Clinic
 from optometry.db.models.optometrist import Optometrist
 from optometry.db.models.optometrist_clinic import OptometristClinic
+from optometry.db.models.patient import Patient
 from optometry.db.models.working_schedule import WorkingSchedule
 from optometry.db.session import get_db
 
 
 @pytest.fixture
-def client(test_session):
+def client(test_session, monkeypatch):
+    monkeypatch.setenv(
+        "JWT_SECRET_KEY",
+        "test-only-secret-not-for-production",
+    )
+
+    patient = Patient(
+        first_name="Booking",
+        last_name="Patient",
+        email="booking-owner@example.com",
+        password_hash=hash_password("secure-test-password-123"),
+    )
+    test_session.add(patient)
+    test_session.flush()
+
+    token = create_access_token(
+        patient_id=patient.id,
+        secret_key="test-only-secret-not-for-production",
+    )
+
     app = FastAPI()
     app.include_router(appointments_router)
     app.include_router(availability_router)
@@ -29,6 +51,7 @@ def client(test_session):
     app.dependency_overrides[get_db] = override_db
 
     with TestClient(app) as test_client:
+        test_client.headers.update({"Authorization": f"Bearer {token}"})
         yield test_client
 
 
@@ -116,7 +139,7 @@ def booking_payload(data, slot):
     }
 
 
-def test_create_booking(client, booking_data):
+def test_create_booking(client, test_session, booking_data):
     slot = first_available_slot(client, booking_data)
 
     response = client.post(
@@ -125,11 +148,28 @@ def test_create_booking(client, booking_data):
     )
 
     assert response.status_code == 201
+
     result = response.json()
+
+    # Verify booking response
     assert result["status"] == "booked"
     assert Decimal(result["appointment_price"]) == Decimal("95.00")
     assert result["start_at"] is not None
     assert result["end_at"] is not None
+
+    # Verify authenticated patient ownership
+    appointment = test_session.get(
+        Appointment,
+        result["id"],
+    )
+
+    assert appointment is not None
+    assert appointment.patient_id is not None
+
+    owner = test_session.get(Patient, appointment.patient_id)
+
+    assert owner is not None
+    assert owner.email == "booking-owner@example.com"
 
 
 def test_booking_removes_slot_from_availability(client, booking_data):

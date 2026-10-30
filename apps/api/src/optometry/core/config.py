@@ -24,3 +24,12 @@ def get_database_url() -> str:
         )
 
     return database_url
+
+
+def get_jwt_secret_key() -> str:
+    secret = os.getenv("JWT_SECRET_KEY")
+
+    if not secret:
+        raise RuntimeError("JWT_SECRET_KEY is not configured")
+
+    return secret

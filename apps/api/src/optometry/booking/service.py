@@ -20,6 +20,7 @@ def create_appointment(
     db: Session,
     payload: AppointmentCreate,
     *,
+    patient_id: int,
     now: datetime,
 ) -> Appointment:
     if payload.start_at.tzinfo is None or payload.start_at.utcoffset() is None:
@@ -85,6 +86,7 @@ def create_appointment(
         end_at=requested_start + timedelta(minutes=APPOINTMENT_DURATION_MINUTES),
         status="booked",
         appointment_price=price,
+        patient_id=patient_id,
     )
 
     try:
@@ -103,8 +105,18 @@ def create_appointment(
     return appointment
 
 
-def get_appointment(db: Session, appointment_id: int) -> Appointment:
-    appointment = db.get(Appointment, appointment_id)
+def get_appointment(
+    db: Session,
+    appointment_id: int,
+    *,
+    patient_id: int,
+) -> Appointment:
+    appointment = db.scalar(
+        select(Appointment).where(
+            Appointment.id == appointment_id,
+            Appointment.patient_id == patient_id,
+        )
+    )
 
     if appointment is None:
         raise HTTPException(
@@ -118,11 +130,12 @@ def get_appointment(db: Session, appointment_id: int) -> Appointment:
 def list_appointments(
     db: Session,
     *,
+    patient_id: int,
     clinic_id: int | None = None,
     optometrist_id: int | None = None,
     status: str | None = None,
 ) -> list[Appointment]:
-    query = select(Appointment)
+    query = select(Appointment).where(Appointment.patient_id == patient_id)
 
     if clinic_id is not None:
         query = query.where(Appointment.clinic_id == clinic_id)
@@ -133,7 +146,10 @@ def list_appointments(
     if status is not None:
         query = query.where(Appointment.status == status)
 
-    query = query.order_by(Appointment.start_at, Appointment.id)
+    query = query.order_by(
+        Appointment.start_at,
+        Appointment.id,
+    )
 
     return list(db.scalars(query).all())
 
@@ -142,10 +158,16 @@ def cancel_appointment(
     db: Session,
     appointment_id: int,
     *,
+    patient_id: int,
     now: datetime,
 ) -> Appointment:
     appointment = db.scalar(
-        select(Appointment).where(Appointment.id == appointment_id).with_for_update()
+        select(Appointment)
+        .where(
+            Appointment.id == appointment_id,
+            Appointment.patient_id == patient_id,
+        )
+        .with_for_update()
     )
 
     if appointment is None:
