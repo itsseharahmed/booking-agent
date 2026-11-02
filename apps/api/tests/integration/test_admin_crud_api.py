@@ -9,6 +9,9 @@ from sqlalchemy.orm import Session
 
 from optometry.api.clinics import router as clinics_router
 from optometry.api.optometrists import router as optometrists_router
+from optometry.core.config import get_jwt_secret_key
+from optometry.core.security import create_admin_access_token, hash_password
+from optometry.db.models.admin import Admin
 from optometry.db.models.clinic import Clinic
 from optometry.db.models.optometrist import Optometrist
 from optometry.db.models.optometrist_clinic import OptometristClinic
@@ -26,7 +29,21 @@ def client(test_session: Session) -> Iterator[TestClient]:
 
     app.dependency_overrides[get_db] = override_db
 
+    admin = Admin(
+        email="admin-crud-test@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        is_active=True,
+    )
+    test_session.add(admin)
+    test_session.flush()
+
+    token = create_admin_access_token(
+        admin_id=admin.id,
+        secret_key=get_jwt_secret_key(),
+    )
+
     with TestClient(app) as test_client:
+        test_client.headers.update({"Authorization": f"Bearer {token}"})
         yield test_client
 
     app.dependency_overrides.clear()

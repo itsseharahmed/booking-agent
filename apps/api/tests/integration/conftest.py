@@ -8,7 +8,9 @@ from dotenv import load_dotenv
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from optometry.core.config import PROJECT_ROOT
+from optometry.core.config import PROJECT_ROOT, get_jwt_secret_key
+from optometry.core.security import create_admin_access_token, hash_password
+from optometry.db.models.admin import Admin
 from tests.database_safety import validate_test_database_name
 
 # Load local development/test settings into the test process.
@@ -74,3 +76,24 @@ def test_session(test_engine: Engine) -> Generator[Session, None, None]:
         # Undo all changes, including changes committed by API endpoints.
         transaction.rollback()
         connection.close()
+
+
+@pytest.fixture
+def admin_auth_headers(
+    test_session: Session,
+) -> dict[str, str]:
+    """Create a test administrator and return its authorization header."""
+    admin = Admin(
+        email="crud-admin@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        is_active=True,
+    )
+    test_session.add(admin)
+    test_session.flush()
+
+    token = create_admin_access_token(
+        admin_id=admin.id,
+        secret_key=get_jwt_secret_key(),
+    )
+
+    return {"Authorization": f"Bearer {token}"}

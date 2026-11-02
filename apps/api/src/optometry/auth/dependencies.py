@@ -41,6 +41,9 @@ def get_current_patient(
             options={"require": ["sub", "exp", "iat"]},
         )
 
+        if payload.get("role") is not None:
+            raise unauthorized
+
         if payload.get("type") != "access":
             raise unauthorized
 

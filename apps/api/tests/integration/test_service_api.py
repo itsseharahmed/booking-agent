@@ -12,14 +12,19 @@ from optometry.main import app
 
 
 @pytest.fixture
-def client(test_session: Session):
+def client(
+    test_session: Session,
+    admin_auth_headers: dict[str, str],
+):
+    """Provide an authenticated admin client using the test database."""
+
     def override_get_db():
         yield test_session
 
     app.dependency_overrides[get_db] = override_get_db
 
     try:
-        with TestClient(app) as test_client:
+        with TestClient(app, headers=admin_auth_headers) as test_client:
             yield test_client
     finally:
         app.dependency_overrides.clear()

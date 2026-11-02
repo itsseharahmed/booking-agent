@@ -8,7 +8,10 @@ from optometry.db.session import get_db
 from optometry.main import app
 
 
-def test_create_optometrist(test_session: Session) -> None:
+def test_create_optometrist(
+    test_session: Session,
+    admin_auth_headers: dict[str, str],
+) -> None:
     """Create an optometrist through the API."""
 
     def override_get_db():
@@ -17,7 +20,7 @@ def test_create_optometrist(test_session: Session) -> None:
     app.dependency_overrides[get_db] = override_get_db
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.post(
                 "/optometrists",
                 json={
@@ -43,6 +46,7 @@ def test_create_optometrist(test_session: Session) -> None:
 
 def test_reject_optometrist_with_whitespace_only_name(
     test_session: Session,
+    admin_auth_headers: dict[str, str],
 ) -> None:
     """Reject optometrist names containing only whitespace."""
 
@@ -52,7 +56,7 @@ def test_reject_optometrist_with_whitespace_only_name(
     app.dependency_overrides[get_db] = override_get_db
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.post(
                 "/optometrists",
                 json={
@@ -68,7 +72,10 @@ def test_reject_optometrist_with_whitespace_only_name(
         app.dependency_overrides.clear()
 
 
-def test_list_optometrists(test_session: Session) -> None:
+def test_list_optometrists(
+    test_session: Session,
+    admin_auth_headers: dict[str, str],
+) -> None:
     """Retrieve optometrists through the API."""
 
     def override_get_db():
@@ -77,7 +84,7 @@ def test_list_optometrists(test_session: Session) -> None:
     app.dependency_overrides[get_db] = override_get_db
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             create_response = client.post(
                 "/optometrists",
                 json={
@@ -110,6 +117,7 @@ def test_list_optometrists(test_session: Session) -> None:
 
 def test_assign_optometrist_to_clinic(
     test_session: Session,
+    admin_auth_headers: dict[str, str],
 ) -> None:
     """Assign an optometrist to an existing clinic."""
 
@@ -132,7 +140,7 @@ def test_assign_optometrist_to_clinic(
     app.dependency_overrides[get_db] = override_get_db
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             create_response = client.post(
                 "/optometrists",
                 json={
@@ -162,6 +170,7 @@ def test_assign_optometrist_to_clinic(
 
 def test_reject_duplicate_clinic_assignment(
     test_session: Session,
+    admin_auth_headers: dict[str, str],
 ) -> None:
     """An optometrist cannot be assigned to the same clinic twice."""
 
@@ -184,7 +193,7 @@ def test_reject_duplicate_clinic_assignment(
     app.dependency_overrides[get_db] = override_get_db
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             create_response = client.post(
                 "/optometrists",
                 json={
@@ -221,6 +230,7 @@ def test_reject_duplicate_clinic_assignment(
 
 def test_reject_assignment_to_nonexistent_optometrist(
     test_session: Session,
+    admin_auth_headers: dict[str, str],
 ) -> None:
     """Return 404 when the optometrist does not exist."""
 
@@ -243,7 +253,7 @@ def test_reject_assignment_to_nonexistent_optometrist(
     app.dependency_overrides[get_db] = override_get_db
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.post(
                 "/optometrists/999999/clinics",
                 json={"clinic_id": clinic.id},
@@ -258,6 +268,7 @@ def test_reject_assignment_to_nonexistent_optometrist(
 
 def test_reject_assignment_to_nonexistent_clinic(
     test_session: Session,
+    admin_auth_headers: dict[str, str],
 ) -> None:
     """Return 404 when the clinic does not exist."""
 
@@ -267,7 +278,7 @@ def test_reject_assignment_to_nonexistent_clinic(
     app.dependency_overrides[get_db] = override_get_db
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             create_response = client.post(
                 "/optometrists",
                 json={

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from optometry.auth.admin_dependencies import get_current_admin
 from optometry.db.models.optometrist_clinic import OptometristClinic
 from optometry.db.models.working_schedule import WorkingSchedule
 from optometry.db.session import get_db
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/schedules", tags=["Schedules"])
     "",
     response_model=WorkingScheduleRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_admin)],
 )
 def create_schedule(
     payload: WorkingScheduleCreate,
@@ -93,6 +95,7 @@ def list_schedules(
 @router.patch(
     "/{schedule_id}",
     response_model=WorkingScheduleRead,
+    dependencies=[Depends(get_current_admin)],
 )
 def update_schedule(
     schedule_id: int,
@@ -149,7 +152,11 @@ def update_schedule(
     return schedule
 
 
-@router.delete("/{schedule_id}", status_code=204)
+@router.delete(
+    "/{schedule_id}",
+    status_code=204,
+    dependencies=[Depends(get_current_admin)],
+)
 def delete_schedule(
     schedule_id: int,
     db: DbSession,

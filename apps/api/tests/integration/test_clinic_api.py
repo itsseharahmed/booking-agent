@@ -1,6 +1,6 @@
 """Integration tests for the clinic API."""
 
-from collections.abc import Generator
+from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,20 +12,20 @@ from optometry.main import app
 
 
 @pytest.fixture
-def client(test_session: Session) -> Generator[TestClient, None, None]:
-    """Use the isolated test database for API requests."""
-
-    def override_get_db() -> Generator[Session, None, None]:
+def client(
+    test_session: Session,
+    admin_auth_headers: dict[str, str],
+) -> Iterator[TestClient]:
+    def override_db() -> Iterator[Session]:
         yield test_session
 
-    # Prevent API requests from accessing the development database.
-    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_db] = override_db
 
-    try:
-        with TestClient(app) as test_client:
-            yield test_client
-    finally:
-        app.dependency_overrides.pop(get_db, None)
+    with TestClient(app) as test_client:
+        test_client.headers.update(admin_auth_headers)
+        yield test_client
+
+    app.dependency_overrides.clear()
 
 
 def test_create_clinic(client: TestClient) -> None:

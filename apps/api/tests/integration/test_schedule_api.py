@@ -1,6 +1,7 @@
 """Integration tests for the working-schedule API."""
 
 from datetime import time
+from functools import partial
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,12 +15,18 @@ from optometry.db.session import get_db
 from optometry.main import app
 
 
-def override_test_db(test_session: Session):
+def override_test_db(
+    test_session: Session,
+    admin_auth_headers: dict[str, str],
+):
     """Provide the test database session to API requests."""
     yield test_session
 
 
-def test_create_schedule(test_session: Session) -> None:
+def test_create_schedule(
+    test_session: Session,
+    admin_auth_headers: dict[str, str],
+) -> None:
     """Create a valid weekly working shift."""
 
     optometrist = Optometrist(
@@ -54,7 +61,7 @@ def test_create_schedule(test_session: Session) -> None:
     app.dependency_overrides[get_db] = override_get_db
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.post(
                 "/schedules",
                 json={
@@ -83,7 +90,10 @@ def test_create_schedule(test_session: Session) -> None:
 
 
 @pytest.fixture
-def schedule_setup(test_session: Session) -> tuple[int, int, int]:
+def schedule_setup(
+    test_session: Session,
+    admin_auth_headers: dict[str, str],
+) -> tuple[int, int, int]:
     """Create one optometrist assigned to two clinics."""
 
     optometrist = Optometrist(
@@ -134,6 +144,7 @@ def schedule_setup(test_session: Session) -> tuple[int, int, int]:
 def test_reject_unassigned_clinic(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
+    admin_auth_headers: dict[str, str],
 ) -> None:
     """Reject schedules at clinics without an assignment."""
 
@@ -152,10 +163,10 @@ def test_reject_unassigned_clinic(
     test_session.add(unassigned_clinic)
     test_session.flush()
 
-    app.dependency_overrides[get_db] = lambda: test_session
+    app.dependency_overrides[get_db] = partial(override_test_db, test_session)
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.post(
                 "/schedules",
                 json={
@@ -176,15 +187,16 @@ def test_reject_unassigned_clinic(
 def test_reject_invalid_schedule_time_range(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
+    admin_auth_headers: dict[str, str],
 ) -> None:
     """Reject a shift ending before it starts."""
 
     optometrist_id, clinic_id, _ = schedule_setup
 
-    app.dependency_overrides[get_db] = lambda: test_session
+    app.dependency_overrides[get_db] = partial(override_test_db, test_session)
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.post(
                 "/schedules",
                 json={
@@ -205,6 +217,7 @@ def test_reject_invalid_schedule_time_range(
 def test_reject_overlapping_schedule(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
+    admin_auth_headers: dict[str, str],
 ) -> None:
     """Reject overlapping shifts for the same optometrist."""
 
@@ -221,10 +234,13 @@ def test_reject_overlapping_schedule(
     )
     test_session.flush()
 
-    app.dependency_overrides[get_db] = lambda: test_session
+    def override_get_db():
+        yield test_session
+
+    app.dependency_overrides[get_db] = override_get_db
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.post(
                 "/schedules",
                 json={
@@ -235,6 +251,8 @@ def test_reject_overlapping_schedule(
                     "end_time": "17:00:00",
                 },
             )
+        print("Response status:", response.status_code)
+        print("Response body:", response.json())
 
         assert response.status_code == 409
 
@@ -245,6 +263,7 @@ def test_reject_overlapping_schedule(
 def test_reject_insufficient_travel_time_api(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
+    admin_auth_headers: dict[str, str],
 ) -> None:
     """Reject less than 60 minutes between different clinics."""
 
@@ -261,10 +280,13 @@ def test_reject_insufficient_travel_time_api(
     )
     test_session.flush()
 
-    app.dependency_overrides[get_db] = lambda: test_session
+    def override_get_db():
+        yield test_session
+
+    app.dependency_overrides[get_db] = override_get_db
 
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.post(
                 "/schedules",
                 json={
@@ -276,6 +298,8 @@ def test_reject_insufficient_travel_time_api(
                 },
             )
 
+        print("Response status:", response.status_code)
+        print("Response body:", response.json())
         assert response.status_code == 409
 
     finally:
@@ -337,6 +361,7 @@ def test_list_schedules(
 def test_update_schedule(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
+    admin_auth_headers: dict[str, str],
 ) -> None:
     """Update the hours of an existing shift."""
 
@@ -358,7 +383,7 @@ def test_update_schedule(
 
     app.dependency_overrides[get_db] = override_get_db
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.patch(
                 f"/schedules/{schedule_id}",
                 json={"end_time": "15:00:00"},
@@ -370,7 +395,10 @@ def test_update_schedule(
         app.dependency_overrides.clear()
 
 
-def test_update_schedule_not_found(test_session: Session) -> None:
+def test_update_schedule_not_found(
+    test_session: Session,
+    admin_auth_headers: dict[str, str],
+) -> None:
     """Return 404 for a missing schedule."""
 
     def override_get_db():
@@ -378,7 +406,7 @@ def test_update_schedule_not_found(test_session: Session) -> None:
 
     app.dependency_overrides[get_db] = override_get_db
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.patch(
                 "/schedules/999999",
                 json={"end_time": "15:00:00"},
@@ -392,6 +420,7 @@ def test_update_schedule_not_found(test_session: Session) -> None:
 def test_update_schedule_rejects_invalid_time(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
+    admin_auth_headers: dict[str, str],
 ) -> None:
     """Reject an update that reverses shift times."""
 
@@ -413,7 +442,7 @@ def test_update_schedule_rejects_invalid_time(
 
     app.dependency_overrides[get_db] = override_get_db
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.patch(
                 f"/schedules/{schedule_id}",
                 json={"start_time": "16:00:00"},
@@ -427,6 +456,7 @@ def test_update_schedule_rejects_invalid_time(
 def test_update_rejects_overlapping_shift(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
+    admin_auth_headers: dict[str, str],
 ) -> None:
     optometrist_id, first_clinic_id, second_clinic_id = schedule_setup
 
@@ -453,7 +483,7 @@ def test_update_rejects_overlapping_shift(
 
     app.dependency_overrides[get_db] = override_get_db
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.patch(
                 f"/schedules/{second_id}",
                 json={"start_time": "11:00:00"},
@@ -466,6 +496,7 @@ def test_update_rejects_overlapping_shift(
 def test_update_rejects_insufficient_travel_buffer(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
+    admin_auth_headers: dict[str, str],
 ) -> None:
     optometrist_id, first_clinic_id, second_clinic_id = schedule_setup
 
@@ -492,7 +523,7 @@ def test_update_rejects_insufficient_travel_buffer(
 
     app.dependency_overrides[get_db] = override_get_db
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.patch(
                 f"/schedules/{second_id}",
                 json={"start_time": "12:30:00"},
@@ -505,6 +536,7 @@ def test_update_rejects_insufficient_travel_buffer(
 def test_update_rejects_unassigned_clinic(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
+    admin_auth_headers: dict[str, str],
 ) -> None:
     optometrist_id, clinic_id, _ = schedule_setup
 
@@ -537,7 +569,7 @@ def test_update_rejects_unassigned_clinic(
 
     app.dependency_overrides[get_db] = override_get_db
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.patch(
                 f"/schedules/{schedule_id}",
                 json={"clinic_id": unassigned_id},
@@ -550,6 +582,7 @@ def test_update_rejects_unassigned_clinic(
 def test_update_rejects_null_time(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
+    admin_auth_headers: dict[str, str],
 ) -> None:
     optometrist_id, clinic_id, _ = schedule_setup
 
@@ -569,7 +602,7 @@ def test_update_rejects_null_time(
 
     app.dependency_overrides[get_db] = override_get_db
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers=admin_auth_headers) as client:
             response = client.patch(
                 f"/schedules/{schedule_id}",
                 json={"start_time": None},

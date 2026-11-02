@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from optometry.api import appointments, auth, patients
+from optometry.api.admin_auth import router as admin_auth_router
 from optometry.api.availability import router as availability_router
 from optometry.api.clinics import router as clinics_router
 from optometry.api.optometrists import router as optometrists_router
@@ -23,6 +24,7 @@ app.include_router(availability_router)
 app.include_router(appointments.router)
 app.include_router(auth.router)
 app.include_router(patients.router)
+app.include_router(admin_auth_router)
 
 
 @app.get("/")

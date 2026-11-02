@@ -40,3 +40,26 @@ def create_access_token(
         secret_key,
         algorithm=JWT_ALGORITHM,
     )
+
+
+def create_admin_access_token(
+    *,
+    admin_id: int,
+    secret_key: str,
+    now: datetime | None = None,
+) -> str:
+    issued_at = now or datetime.now(UTC)
+
+    payload: dict[str, Any] = {
+        "sub": str(admin_id),
+        "iat": issued_at,
+        "exp": issued_at + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        "type": "access",
+        "role": "admin",
+    }
+
+    return jwt.encode(
+        payload,
+        secret_key,
+        algorithm=JWT_ALGORITHM,
+    )

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from optometry.auth.admin_dependencies import get_current_admin
 from optometry.db.models.clinic import Clinic
 from optometry.db.session import get_db
 from optometry.schemas.clinic import (
@@ -26,6 +27,7 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
     "",
     response_model=ClinicRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_admin)],
 )
 def create_clinic(clinic_data: ClinicCreate, db: DatabaseSession) -> Clinic:
     """Create a clinic and persist it to PostgreSQL."""
@@ -74,6 +76,7 @@ def get_clinic(clinic_id: int, db: DatabaseSession) -> Clinic:
 @router.patch(
     "/{clinic_id}/appointment-price",
     response_model=ClinicRead,
+    dependencies=[Depends(get_current_admin)],
 )
 def update_clinic_appointment_price(
     clinic_id: int,
@@ -97,7 +100,11 @@ def update_clinic_appointment_price(
     return clinic
 
 
-@router.patch("/{clinic_id}", response_model=ClinicRead)
+@router.patch(
+    "/{clinic_id}",
+    response_model=ClinicRead,
+    dependencies=[Depends(get_current_admin)],
+)
 def update_clinic(
     clinic_id: int,
     payload: ClinicUpdate,
@@ -116,7 +123,11 @@ def update_clinic(
     return clinic
 
 
-@router.delete("/{clinic_id}", status_code=204)
+@router.delete(
+    "/{clinic_id}",
+    status_code=204,
+    dependencies=[Depends(get_current_admin)],
+)
 def delete_clinic(
     clinic_id: int,
     db: DatabaseSession,

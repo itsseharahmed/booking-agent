@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from optometry.auth.admin_dependencies import get_current_admin
 from optometry.db.models.appointment_service import AppointmentService
 from optometry.db.session import get_db
 from optometry.schemas.appointment_service import (
@@ -24,6 +25,7 @@ DbSession = Annotated[Session, Depends(get_db)]
     "",
     response_model=AppointmentServiceRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_admin)],
 )
 def create_service(
     payload: AppointmentServiceCreate,
@@ -72,7 +74,11 @@ def get_service(
     return service
 
 
-@router.patch("/{service_id}", response_model=AppointmentServiceRead)
+@router.patch(
+    "/{service_id}",
+    response_model=AppointmentServiceRead,
+    dependencies=[Depends(get_current_admin)],
+)
 def update_service(
     service_id: int,
     payload: AppointmentServiceUpdate,
@@ -99,7 +105,11 @@ def update_service(
     return service
 
 
-@router.delete("/{service_id}", status_code=204)
+@router.delete(
+    "/{service_id}",
+    status_code=204,
+    dependencies=[Depends(get_current_admin)],
+)
 def delete_service(
     service_id: int,
     db: DbSession,
