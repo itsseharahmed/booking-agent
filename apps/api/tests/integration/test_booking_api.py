@@ -437,3 +437,22 @@ def test_appointment_interval_is_twenty_minutes(client, booking_data):
     end = datetime.fromisoformat(response.json()["end_at"])
 
     assert end - start == timedelta(minutes=20)
+
+
+def test_booking_response_uses_toronto_timezone(
+    client,
+    booking_data,
+):
+    slot = first_available_slot(client, booking_data)
+
+    response = client.post(
+        "/appointments",
+        json=booking_payload(booking_data, slot),
+    )
+
+    assert response.status_code == 201
+
+    result = response.json()
+
+    assert result["start_at"] == slot["start"]
+    assert result["end_at"] == slot["end"]

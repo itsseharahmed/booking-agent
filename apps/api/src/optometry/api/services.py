@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -97,3 +97,31 @@ def update_service(
 
     db.refresh(service)
     return service
+
+
+@router.delete("/{service_id}", status_code=204)
+def delete_service(
+    service_id: int,
+    db: DbSession,
+) -> Response:
+    service = db.get(AppointmentService, service_id)
+
+    if service is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Appointment service not found",
+        )
+
+    try:
+        with db.begin_nested():
+            db.delete(service)
+            db.flush()
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Service has related appointments; deactivate it instead",
+        ) from exc
+
+    db.commit()
+
+    return Response(status_code=204)

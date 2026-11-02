@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -147,3 +147,22 @@ def update_schedule(
 
     db.refresh(schedule)
     return schedule
+
+
+@router.delete("/{schedule_id}", status_code=204)
+def delete_schedule(
+    schedule_id: int,
+    db: DbSession,
+) -> Response:
+    schedule = db.get(WorkingSchedule, schedule_id)
+
+    if schedule is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Working schedule not found",
+        )
+
+    db.delete(schedule)
+    db.commit()
+
+    return Response(status_code=204)

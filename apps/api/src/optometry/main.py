@@ -25,6 +25,15 @@ app.include_router(auth.router)
 app.include_router(patients.router)
 
 
+@app.get("/")
+def home() -> dict[str, str]:
+    return {
+        "message": "Optometry Booking Agent API",
+        "status": "running",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health")
 def health_check() -> dict[str, str]:
     # report whether api process is running

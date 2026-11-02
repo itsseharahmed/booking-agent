@@ -2,8 +2,9 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from optometry.db.models.clinic import Clinic
@@ -12,6 +13,7 @@ from optometry.schemas.clinic import (
     ClinicAppointmentPriceUpdate,
     ClinicCreate,
     ClinicRead,
+    ClinicUpdate,
 )
 
 router = APIRouter(prefix="/clinics", tags=["Clinics"])
@@ -93,3 +95,46 @@ def update_clinic_appointment_price(
     db.refresh(clinic)
 
     return clinic
+
+
+@router.patch("/{clinic_id}", response_model=ClinicRead)
+def update_clinic(
+    clinic_id: int,
+    payload: ClinicUpdate,
+    db: DatabaseSession,
+) -> Clinic:
+    clinic = db.get(Clinic, clinic_id)
+
+    if clinic is None:
+        raise HTTPException(status_code=404, detail="Clinic not found")
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(clinic, field, value)
+
+    db.commit()
+    db.refresh(clinic)
+    return clinic
+
+
+@router.delete("/{clinic_id}", status_code=204)
+def delete_clinic(
+    clinic_id: int,
+    db: DatabaseSession,
+) -> Response:
+    clinic = db.get(Clinic, clinic_id)
+
+    if clinic is None:
+        raise HTTPException(status_code=404, detail="Clinic not found")
+
+    try:
+        with db.begin_nested():
+            db.delete(clinic)
+            db.flush()
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Clinic has related records; deactivate it instead",
+        ) from exc
+
+    db.commit()
+    return Response(status_code=204)

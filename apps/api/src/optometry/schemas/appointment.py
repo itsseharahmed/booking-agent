@@ -1,8 +1,9 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
+from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 
 class AppointmentCreate(BaseModel):
@@ -14,6 +15,10 @@ class AppointmentCreate(BaseModel):
 
 class AppointmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("start_at", "end_at")
+    def serialize_toronto_time(self, value: datetime) -> str:
+        return value.astimezone(ZoneInfo("America/Toronto")).isoformat()
 
     id: int
     clinic_id: int

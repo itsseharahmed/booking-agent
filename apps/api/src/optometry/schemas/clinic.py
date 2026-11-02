@@ -3,7 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ClinicCreate(BaseModel):
@@ -81,3 +81,29 @@ class ClinicAppointmentPriceUpdate(BaseModel):
         max_digits=10,
         decimal_places=2,
     )
+
+
+class ClinicUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=150)
+    address_line1: str | None = Field(default=None, min_length=1)
+    address_line2: str | None = None
+    city: str | None = Field(default=None, min_length=1)
+    province: str | None = Field(default=None, min_length=1)
+    postal_code: str | None = Field(default=None, min_length=1)
+    country: str | None = Field(default=None, min_length=1)
+    phone: str | None = None
+    is_active: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_update(self) -> "ClinicUpdate":
+        if not self.model_fields_set:
+            raise ValueError("At least one field must be provided")
+
+        for field in self.model_fields_set:
+            if getattr(self, field) is None and field not in {
+                "address_line2",
+                "phone",
+            }:
+                raise ValueError(f"{field} cannot be null")
+
+        return self

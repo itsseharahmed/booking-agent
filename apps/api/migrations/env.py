@@ -12,6 +12,7 @@ from optometry.db.models.appointment_service import AppointmentService  # noqa: 
 from optometry.db.models.clinic import Clinic  # noqa: F401
 from optometry.db.models.optometrist import Optometrist  # noqa: F401
 from optometry.db.models.optometrist_clinic import OptometristClinic  # noqa: F401
+from optometry.db.models.patient import Patient  # noqa: F401
 from optometry.db.models.schema_check import SchemaCheck  # noqa: F401
 from optometry.db.models.working_schedule import WorkingSchedule  # noqa: F401
 

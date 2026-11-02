@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class OptometristCreate(BaseModel):
@@ -36,3 +36,23 @@ class OptometristRead(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class OptometristUpdate(BaseModel):
+    first_name: str | None = Field(default=None, min_length=1, max_length=100)
+    last_name: str | None = Field(default=None, min_length=1, max_length=100)
+    license_number: str | None = None
+    is_active: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_update(self) -> "OptometristUpdate":
+        if not self.model_fields_set:
+            raise ValueError("At least one field must be provided")
+
+        for field in self.model_fields_set:
+            if getattr(self, field) is None and field not in {
+                "license_number",
+            }:
+                raise ValueError(f"{field} cannot be null")
+
+        return self
