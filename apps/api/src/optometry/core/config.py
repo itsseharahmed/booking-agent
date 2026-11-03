@@ -52,3 +52,18 @@ def get_test_redis_url() -> str:
     if not redis_url:
         raise RuntimeError("REDIS_TESTING_URL is not configured")
     return redis_url
+
+
+# loads the groq api key
+def get_groq_api_key() -> str:
+    api_key = os.getenv("GROQ_API_KEY")
+
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY is not configured")
+
+    return api_key
+
+
+# loads the configured groq model
+def get_groq_model() -> str:
+    return os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
