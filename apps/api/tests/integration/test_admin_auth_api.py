@@ -19,11 +19,15 @@ from optometry.db.models.admin import Admin
 from optometry.db.session import get_db
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# builds the test client used by the test.
 def client(test_session: Session) -> Iterator[TestClient]:
+    # creates the api application.
     app = FastAPI()
     app.include_router(router)
 
+    # overrides a dependency during the test.
     def override_db() -> Iterator[Session]:
         yield test_session
 
@@ -35,7 +39,9 @@ def client(test_session: Session) -> Iterator[TestClient]:
     app.dependency_overrides.clear()
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the admin workflow.
 def admin(test_session: Session) -> Admin:
     record = Admin(
         email="admin@example.com",
@@ -47,6 +53,7 @@ def admin(test_session: Session) -> Admin:
     return record
 
 
+# checks that admin login success works as expected.
 def test_admin_login_success(
     client: TestClient,
     admin: Admin,
@@ -75,6 +82,7 @@ def test_admin_login_success(
     assert claims["type"] == "access"
 
 
+# checks that admin login wrong password works as expected.
 def test_admin_login_wrong_password(
     client: TestClient,
     admin: Admin,
@@ -90,6 +98,7 @@ def test_admin_login_wrong_password(
     assert response.status_code == 401
 
 
+# checks that admin login unknown email works as expected.
 def test_admin_login_unknown_email(
     client: TestClient,
 ) -> None:
@@ -104,6 +113,7 @@ def test_admin_login_unknown_email(
     assert response.status_code == 401
 
 
+# checks that inactive admin cannot login works as expected.
 def test_inactive_admin_cannot_login(
     client: TestClient,
     admin: Admin,
@@ -123,6 +133,7 @@ def test_inactive_admin_cannot_login(
     assert response.status_code == 401
 
 
+# checks that patient token has no admin role works as expected.
 def test_patient_token_has_no_admin_role() -> None:
     token = create_access_token(
         patient_id=123,

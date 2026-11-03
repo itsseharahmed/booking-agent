@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 
+# handles the AppointmentCreate workflow.
 class AppointmentCreate(BaseModel):
     clinic_id: int = Field(gt=0)
     optometrist_id: int = Field(gt=0)
@@ -13,10 +14,12 @@ class AppointmentCreate(BaseModel):
     start_at: datetime
 
 
+# handles the AppointmentRead workflow.
 class AppointmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     @field_serializer("start_at", "end_at")
+    # handles the serialize toronto time workflow.
     def serialize_toronto_time(self, value: datetime) -> str:
         return value.astimezone(ZoneInfo("America/Toronto")).isoformat()
 

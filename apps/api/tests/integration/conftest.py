@@ -13,11 +13,13 @@ from optometry.core.security import create_admin_access_token, hash_password
 from optometry.db.models.admin import Admin
 from tests.database_safety import validate_test_database_name
 
-# Load local development/test settings into the test process.
+# load local development/test settings into the test process.
 load_dotenv(PROJECT_ROOT / ".env")
 
 
+# creates the shared test fixture.
 @pytest.fixture(scope="session")
+# checks that engine works as expected.
 def test_engine() -> Generator[Engine, None, None]:
     """Connect only to the dedicated PostgreSQL test database."""
 
@@ -26,11 +28,11 @@ def test_engine() -> Generator[Engine, None, None]:
     if not database_url:
         pytest.fail("TEST_DATABASE_URL must be configured.")
 
-    # Create a connection engine using the test configuration.
+    # creates the database engine used by sqlalchemy.
     engine = create_engine(database_url, pool_pre_ping=True)
 
     try:
-        # Verify the actual database, not just the URL string.
+        # verify the actual database, not just the URL string.
         with engine.connect() as connection:
             database_name = connection.execute(
                 text("SELECT current_database()")
@@ -44,21 +46,23 @@ def test_engine() -> Generator[Engine, None, None]:
         yield engine
 
     finally:
-        # Release all database connections after testing.
+        # release all database connections after testing.
         engine.dispose()
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# checks that session works as expected.
 def test_session(test_engine: Engine) -> Generator[Session, None, None]:
     """Provide a session whose changes are rolled back after each test."""
 
-    # Open a dedicated connection for this test.
+    # open a dedicated connection for this test.
     connection = test_engine.connect()
 
-    # Begin an outer transaction that the application cannot commit.
+    # begin an outer transaction that the application cannot commit.
     transaction = connection.begin()
 
-    # SQLAlchemy creates savepoints for session-level transactions.
+    # sQLAlchemy creates savepoints for session-level transactions.
     session_factory = sessionmaker(
         bind=connection,
         autoflush=False,
@@ -73,12 +77,14 @@ def test_session(test_engine: Engine) -> Generator[Session, None, None]:
     finally:
         session.close()
 
-        # Undo all changes, including changes committed by API endpoints.
+        # undo all changes, including changes committed by API endpoints.
         transaction.rollback()
         connection.close()
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the admin auth headers workflow.
 def admin_auth_headers(
     test_session: Session,
 ) -> dict[str, str]:

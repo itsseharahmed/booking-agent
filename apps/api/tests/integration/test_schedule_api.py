@@ -15,6 +15,7 @@ from optometry.db.session import get_db
 from optometry.main import app
 
 
+# overrides a dependency during the test.
 def override_test_db(
     test_session: Session,
     admin_auth_headers: dict[str, str],
@@ -23,6 +24,7 @@ def override_test_db(
     yield test_session
 
 
+# checks that create schedule works as expected.
 def test_create_schedule(
     test_session: Session,
     admin_auth_headers: dict[str, str],
@@ -55,6 +57,7 @@ def test_create_schedule(
     )
     test_session.flush()
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -89,7 +92,9 @@ def test_create_schedule(
         app.dependency_overrides.clear()
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the schedule setup workflow.
 def schedule_setup(
     test_session: Session,
     admin_auth_headers: dict[str, str],
@@ -141,6 +146,7 @@ def schedule_setup(
     return optometrist.id, first_clinic.id, second_clinic.id
 
 
+# checks that reject unassigned clinic works as expected.
 def test_reject_unassigned_clinic(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
@@ -184,6 +190,7 @@ def test_reject_unassigned_clinic(
         app.dependency_overrides.clear()
 
 
+# checks that reject invalid schedule time range works as expected.
 def test_reject_invalid_schedule_time_range(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
@@ -214,6 +221,7 @@ def test_reject_invalid_schedule_time_range(
         app.dependency_overrides.clear()
 
 
+# checks that reject overlapping schedule works as expected.
 def test_reject_overlapping_schedule(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
@@ -234,6 +242,7 @@ def test_reject_overlapping_schedule(
     )
     test_session.flush()
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -260,6 +269,7 @@ def test_reject_overlapping_schedule(
         app.dependency_overrides.clear()
 
 
+# checks that reject insufficient travel time api works as expected.
 def test_reject_insufficient_travel_time_api(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
@@ -280,6 +290,7 @@ def test_reject_insufficient_travel_time_api(
     )
     test_session.flush()
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -306,6 +317,7 @@ def test_reject_insufficient_travel_time_api(
         app.dependency_overrides.clear()
 
 
+# checks that list schedules works as expected.
 def test_list_schedules(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
@@ -334,6 +346,7 @@ def test_list_schedules(
     )
     test_session.flush()
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -358,6 +371,7 @@ def test_list_schedules(
         app.dependency_overrides.clear()
 
 
+# checks that update schedule works as expected.
 def test_update_schedule(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
@@ -378,6 +392,7 @@ def test_update_schedule(
     test_session.flush()
     schedule_id = schedule.id
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -395,12 +410,14 @@ def test_update_schedule(
         app.dependency_overrides.clear()
 
 
+# checks that update schedule not found works as expected.
 def test_update_schedule_not_found(
     test_session: Session,
     admin_auth_headers: dict[str, str],
 ) -> None:
     """Return 404 for a missing schedule."""
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -417,6 +434,7 @@ def test_update_schedule_not_found(
         app.dependency_overrides.clear()
 
 
+# checks that update schedule rejects invalid time works as expected.
 def test_update_schedule_rejects_invalid_time(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
@@ -437,6 +455,7 @@ def test_update_schedule_rejects_invalid_time(
     test_session.flush()
     schedule_id = schedule.id
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -453,6 +472,7 @@ def test_update_schedule_rejects_invalid_time(
         app.dependency_overrides.clear()
 
 
+# checks that update rejects overlapping shift works as expected.
 def test_update_rejects_overlapping_shift(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
@@ -478,6 +498,7 @@ def test_update_rejects_overlapping_shift(
     test_session.flush()
     second_id = second.id
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -493,6 +514,7 @@ def test_update_rejects_overlapping_shift(
         app.dependency_overrides.clear()
 
 
+# checks that update rejects insufficient travel buffer works as expected.
 def test_update_rejects_insufficient_travel_buffer(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
@@ -518,6 +540,7 @@ def test_update_rejects_insufficient_travel_buffer(
     test_session.flush()
     second_id = second.id
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -533,6 +556,7 @@ def test_update_rejects_insufficient_travel_buffer(
         app.dependency_overrides.clear()
 
 
+# checks that update rejects unassigned clinic works as expected.
 def test_update_rejects_unassigned_clinic(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
@@ -564,6 +588,7 @@ def test_update_rejects_unassigned_clinic(
     schedule_id = schedule.id
     unassigned_id = unassigned.id
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -579,6 +604,7 @@ def test_update_rejects_unassigned_clinic(
         app.dependency_overrides.clear()
 
 
+# checks that update rejects null time works as expected.
 def test_update_rejects_null_time(
     test_session: Session,
     schedule_setup: tuple[int, int, int],
@@ -597,6 +623,7 @@ def test_update_rejects_null_time(
     test_session.flush()
     schedule_id = schedule.id
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 

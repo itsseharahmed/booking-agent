@@ -1,4 +1,4 @@
-"""API endpoints for managing optometrists."""
+# API endpoints for managing optometrists.
 
 from typing import Annotated
 
@@ -22,8 +22,10 @@ from optometry.schemas.optometrist_clinic import (
     OptometristClinicRead,
 )
 
+# database session dependency used by this module.
 DbSession = Annotated[Session, Depends(get_db)]
 
+# router for this api module.
 router = APIRouter(prefix="/optometrists", tags=["Optometrists"])
 
 
@@ -33,6 +35,7 @@ router = APIRouter(prefix="/optometrists", tags=["Optometrists"])
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(get_current_admin)],
 )
+# creates a new optometrist.
 def create_optometrist(
     payload: OptometristCreate,
     db: DbSession,
@@ -49,6 +52,7 @@ def create_optometrist(
 
 
 @router.get("", response_model=list[OptometristRead])
+# lists all optometrists records.
 def list_optometrists(
     db: DbSession,
 ) -> list[Optometrist]:
@@ -65,6 +69,7 @@ def list_optometrists(
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(get_current_admin)],
 )
+# handles the assign optometrist to clinic workflow.
 def assign_optometrist_to_clinic(
     optometrist_id: int,
     payload: OptometristClinicCreate,
@@ -93,7 +98,7 @@ def assign_optometrist_to_clinic(
             status_code=409,
             detail="Cannot assign optometrist to an inactive clinic",
         )
-    
+
     existing_assignment = db.get(
         OptometristClinic,
         (optometrist_id, payload.clinic_id),
@@ -121,6 +126,7 @@ def assign_optometrist_to_clinic(
     response_model=OptometristRead,
     dependencies=[Depends(get_current_admin)],
 )
+# updates the optometrist record.
 def update_optometrist(
     optometrist_id: int,
     payload: OptometristUpdate,
@@ -144,6 +150,7 @@ def update_optometrist(
     status_code=204,
     dependencies=[Depends(get_current_admin)],
 )
+# deletes the optometrist record.
 def delete_optometrist(
     optometrist_id: int,
     db: DbSession,

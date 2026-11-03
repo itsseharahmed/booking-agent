@@ -14,7 +14,9 @@ from optometry.db.models.optometrist import Optometrist
 from optometry.db.models.optometrist_clinic import OptometristClinic
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the booking data workflow.
 def booking_data(test_session: Session):
     clinic = Clinic(
         name="Booking Model Test Clinic",
@@ -50,6 +52,7 @@ def booking_data(test_session: Session):
     return clinic, optometrist, service
 
 
+# handles the make appointment workflow.
 def make_appointment(
     booking_data,
     *,
@@ -72,6 +75,7 @@ def make_appointment(
     )
 
 
+# checks that same optometrist cannot overlap across clinics works as expected.
 def test_same_optometrist_cannot_overlap_across_clinics(test_session, booking_data):
     _, optometrist, service = booking_data
 
@@ -115,6 +119,7 @@ def test_same_optometrist_cannot_overlap_across_clinics(test_session, booking_da
         test_session.flush()
 
 
+# checks that create appointment works as expected.
 def test_create_appointment(test_session, booking_data):
     appointment = make_appointment(booking_data)
     test_session.add(appointment)
@@ -124,6 +129,7 @@ def test_create_appointment(test_session, booking_data):
     assert appointment.status == "booked"
 
 
+# checks that overlapping appointments rejected works as expected.
 def test_overlapping_appointments_rejected(test_session, booking_data):
     first = make_appointment(booking_data)
     test_session.add(first)
@@ -139,6 +145,7 @@ def test_overlapping_appointments_rejected(test_session, booking_data):
         test_session.flush()
 
 
+# checks that adjacent appointments allowed works as expected.
 def test_adjacent_appointments_allowed(test_session, booking_data):
     first = make_appointment(booking_data)
     second = make_appointment(
@@ -152,6 +159,7 @@ def test_adjacent_appointments_allowed(test_session, booking_data):
     assert first.id != second.id
 
 
+# checks that cancelled appointment releases slot works as expected.
 def test_cancelled_appointment_releases_slot(test_session, booking_data):
     cancelled = make_appointment(
         booking_data,
@@ -165,6 +173,7 @@ def test_cancelled_appointment_releases_slot(test_session, booking_data):
     assert replacement.id is not None
 
 
+# checks that invalid duration rejected works as expected.
 def test_invalid_duration_rejected(test_session, booking_data):
     appointment = make_appointment(booking_data)
     appointment.end_at = appointment.start_at + timedelta(minutes=30)
@@ -174,6 +183,7 @@ def test_invalid_duration_rejected(test_session, booking_data):
         test_session.flush()
 
 
+# checks that negative price rejected works as expected.
 def test_negative_price_rejected(test_session, booking_data):
     appointment = make_appointment(booking_data)
     appointment.appointment_price = Decimal("-1.00")
@@ -183,6 +193,7 @@ def test_negative_price_rejected(test_session, booking_data):
         test_session.flush()
 
 
+# checks that invalid status rejected works as expected.
 def test_invalid_status_rejected(test_session, booking_data):
     appointment = make_appointment(
         booking_data,

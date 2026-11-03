@@ -1,4 +1,5 @@
 """Database model for optometrists."""
+# this file contains the src / optometry / db / models / optometrist.py logic.
 
 from datetime import datetime
 
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from optometry.db.base import Base
 
 
+# handles the Optometrist workflow.
 class Optometrist(Base):
     """Represent an optometrist who provides appointments."""
 
@@ -18,7 +20,7 @@ class Optometrist(Base):
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
 
-    # Optional until professional details are entered.
+    # optional until professional details are entered.
     license_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

@@ -4,6 +4,7 @@ from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 
 
+# checks that optometrists table exists works as expected.
 def test_optometrists_table_exists(test_engine: Engine) -> None:
     """The database should contain an optometrists table."""
     inspector = inspect(test_engine)
@@ -11,6 +12,7 @@ def test_optometrists_table_exists(test_engine: Engine) -> None:
     assert "optometrists" in inspector.get_table_names()
 
 
+# checks that optometrist clinics table exists works as expected.
 def test_optometrist_clinics_table_exists(test_engine: Engine) -> None:
     """The database should contain the clinic association table."""
     inspector = inspect(test_engine)
@@ -18,6 +20,7 @@ def test_optometrist_clinics_table_exists(test_engine: Engine) -> None:
     assert "optometrist_clinics" in inspector.get_table_names()
 
 
+# checks that working schedules table exists works as expected.
 def test_working_schedules_table_exists(test_engine: Engine) -> None:
     """The database should contain a working schedules table."""
     inspector = inspect(test_engine)

@@ -7,10 +7,11 @@ from sqlalchemy.orm import Session, sessionmaker
 from optometry.db.models.clinic import Clinic
 
 
+# checks that committed changes are rolled back works as expected.
 def test_committed_changes_are_rolled_back(test_engine: Engine) -> None:
     """A session commit must not persist beyond the outer transaction."""
 
-    # Open a connection and start an outer transaction.
+    # open a connection and start an outer transaction.
     with test_engine.connect() as connection:
         outer_transaction = connection.begin()
 
@@ -37,13 +38,13 @@ def test_committed_changes_are_rolled_back(test_engine: Engine) -> None:
 
             clinic_id = clinic.id
 
-            # The clinic exists inside the current transaction.
+            # the clinic exists inside the current transaction.
             assert session.get(Clinic, clinic_id) is not None
 
-        # Undo all writes, including the session's commit.
+        # undo all writes, including the session's commit.
         outer_transaction.rollback()
 
-    # Verify the record does not exist on a separate connection.
+    # verify the record does not exist on a separate connection.
     with Session(test_engine) as verification_session:
         persisted_clinic = verification_session.scalar(
             select(Clinic).where(Clinic.id == clinic_id)

@@ -1,4 +1,4 @@
-"""Administrator authentication."""
+# Administrator authentication.
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
@@ -9,6 +9,7 @@ from optometry.db.models.admin import Admin
 from optometry.schemas.admin import AdminLogin
 
 
+# validates the admin credentials.
 def authenticate_admin(
     db: Session,
     payload: AdminLogin,

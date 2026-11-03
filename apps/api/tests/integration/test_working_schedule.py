@@ -12,7 +12,9 @@ from optometry.db.models.optometrist_clinic import OptometristClinic
 from optometry.db.models.working_schedule import WorkingSchedule
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the assigned clinic workflow.
 def assigned_clinic(test_session: Session) -> tuple[int, int]:
     """Create an optometrist assigned to a clinic."""
 
@@ -45,6 +47,7 @@ def assigned_clinic(test_session: Session) -> tuple[int, int]:
     return optometrist.id, clinic.id
 
 
+# checks that create valid schedule works as expected.
 def test_create_valid_schedule(
     test_session: Session,
     assigned_clinic: tuple[int, int],
@@ -68,6 +71,7 @@ def test_create_valid_schedule(
     assert schedule.is_active is True
 
 
+# checks that reject invalid weekday works as expected.
 def test_reject_invalid_weekday(
     test_session: Session,
     assigned_clinic: tuple[int, int],
@@ -90,6 +94,7 @@ def test_reject_invalid_weekday(
         test_session.flush()
 
 
+# checks that reject invalid time range works as expected.
 def test_reject_invalid_time_range(
     test_session: Session,
     assigned_clinic: tuple[int, int],
@@ -112,6 +117,7 @@ def test_reject_invalid_time_range(
         test_session.flush()
 
 
+# checks that reject schedule at unassigned clinic works as expected.
 def test_reject_schedule_at_unassigned_clinic(
     test_session: Session,
     assigned_clinic: tuple[int, int],
@@ -147,6 +153,7 @@ def test_reject_schedule_at_unassigned_clinic(
         test_session.flush()
 
 
+# checks that reject overlapping schedules works as expected.
 def test_reject_overlapping_schedules(
     test_session: Session,
     assigned_clinic: tuple[int, int],
@@ -180,6 +187,7 @@ def test_reject_overlapping_schedules(
         test_session.flush()
 
 
+# checks that reject insufficient travel time works as expected.
 def test_reject_insufficient_travel_time(
     test_session: Session,
     assigned_clinic: tuple[int, int],
@@ -201,7 +209,7 @@ def test_reject_insufficient_travel_time(
     test_session.add(second_clinic)
     test_session.flush()
 
-    # Assign the same optometrist to the second clinic.
+    # assign the same optometrist to the second clinic.
     test_session.add(
         OptometristClinic(
             optometrist_id=optometrist_id,
@@ -235,6 +243,7 @@ def test_reject_insufficient_travel_time(
         test_session.flush()
 
 
+# checks that allow exactly 60 minutes between clinics works as expected.
 def test_allow_exactly_60_minutes_between_clinics(
     test_session: Session,
     assigned_clinic: tuple[int, int],
@@ -286,6 +295,7 @@ def test_allow_exactly_60_minutes_between_clinics(
     assert second_shift.id is not None
 
 
+# checks that reject multiple active shifts at same clinic works as expected.
 def test_reject_multiple_active_shifts_at_same_clinic(
     test_session: Session,
     assigned_clinic: tuple[int, int],
@@ -319,6 +329,7 @@ def test_reject_multiple_active_shifts_at_same_clinic(
         test_session.flush()
 
 
+# checks that inactive shift does not block replacement works as expected.
 def test_inactive_shift_does_not_block_replacement(
     test_session: Session,
     assigned_clinic: tuple[int, int],
@@ -354,6 +365,7 @@ def test_inactive_shift_does_not_block_replacement(
     assert replacement_shift.is_active is True
 
 
+# checks that reject schedule update with insufficient travel time works as expected.
 def test_reject_schedule_update_with_insufficient_travel_time(
     test_session: Session,
     assigned_clinic: tuple[int, int],
@@ -402,7 +414,7 @@ def test_reject_schedule_update_with_insufficient_travel_time(
     test_session.add_all([first_shift, second_shift])
     test_session.flush()
 
-    # Move the second shift earlier, leaving only 30 minutes.
+    # move the second shift earlier, leaving only 30 minutes.
     second_shift.start_time = time(13, 30)
 
     with pytest.raises(IntegrityError):

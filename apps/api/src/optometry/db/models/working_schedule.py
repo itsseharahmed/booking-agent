@@ -1,4 +1,5 @@
 """Recurring weekly working schedules for optometrists."""
+# this file contains the src / optometry / db / models / working_schedule.py logic.
 
 from datetime import time
 
@@ -16,13 +17,14 @@ from sqlalchemy.orm import Mapped, mapped_column
 from optometry.db.base import Base
 
 
+# handles the WorkingSchedule workflow.
 class WorkingSchedule(Base):
     """Represent a recurring shift at an assigned clinic."""
 
     __tablename__ = "working_schedules"
 
     __table_args__ = (
-        # A shift must belong to a valid optometrist-clinic assignment.
+        # a shift must belong to a valid optometrist-clinic assignment.
         ForeignKeyConstraint(
             ["optometrist_id", "clinic_id"],
             [
@@ -30,12 +32,12 @@ class WorkingSchedule(Base):
                 "optometrist_clinics.clinic_id",
             ],
         ),
-        # Monday = 0, Sunday = 6.
+        # monday = 0, Sunday = 6.
         CheckConstraint(
             "day_of_week BETWEEN 0 AND 6",
             name="ck_working_schedules_day_of_week",
         ),
-        # For now, shifts must begin and end on the same day.
+        # for now, shifts must begin and end on the same day.
         CheckConstraint(
             "start_time < end_time",
             name="ck_working_schedules_time_order",
@@ -57,7 +59,7 @@ class WorkingSchedule(Base):
 
     day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # Local clock times in the clinic's timezone.
+    # local clock times in the clinic's timezone.
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     end_time: Mapped[time] = mapped_column(Time, nullable=False)
 

@@ -6,6 +6,7 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+# handles the WorkingScheduleCreate workflow.
 class WorkingScheduleCreate(BaseModel):
     """Validate a new weekly working shift."""
 
@@ -16,6 +17,7 @@ class WorkingScheduleCreate(BaseModel):
     end_time: time
 
     @model_validator(mode="after")
+    # validates the time range input.
     def validate_time_range(self) -> "WorkingScheduleCreate":
         """Require the shift to end after it starts."""
         if self.start_time >= self.end_time:
@@ -24,6 +26,7 @@ class WorkingScheduleCreate(BaseModel):
         return self
 
 
+# handles the WorkingScheduleRead workflow.
 class WorkingScheduleRead(BaseModel):
     """Return a weekly working shift."""
 
@@ -38,6 +41,7 @@ class WorkingScheduleRead(BaseModel):
     is_active: bool
 
 
+# handles the WorkingScheduleUpdate workflow.
 class WorkingScheduleUpdate(BaseModel):
     """Fields that may be changed on an existing shift."""
 
@@ -48,6 +52,7 @@ class WorkingScheduleUpdate(BaseModel):
     is_active: bool | None = None
 
     @model_validator(mode="after")
+    # handles the reject explicit nulls workflow.
     def reject_explicit_nulls(self) -> Self:
         """Do not allow null to replace required database values."""
         for name in self.model_fields_set:

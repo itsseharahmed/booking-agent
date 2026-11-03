@@ -1,4 +1,4 @@
-"""Authenticated patient appointment endpoints."""
+# authenticated patient appointment endpoints.
 
 from datetime import UTC, datetime
 from typing import Annotated, Literal
@@ -21,12 +21,16 @@ from optometry.schemas.appointment import (
     AppointmentRead,
 )
 
+# router for this api module.
 router = APIRouter(
     prefix="/appointments",
     tags=["appointments"],
 )
 
+# database session dependency used by this module.
 DbSession = Annotated[Session, Depends(get_db)]
+
+# stores the authenticated user for this endpoint.
 CurrentPatient = Annotated[Patient, Depends(get_current_patient)]
 
 
@@ -35,11 +39,13 @@ CurrentPatient = Annotated[Patient, Depends(get_current_patient)]
     response_model=AppointmentRead,
     status_code=201,
 )
+# creates a new booking.
 def create_booking(
     payload: AppointmentCreate,
     db: DbSession,
     patient: CurrentPatient,
 ) -> Appointment:
+    # create a new appointment tied to the currently authenticated patient.
     return create_appointment(
         db,
         payload,
@@ -49,6 +55,7 @@ def create_booking(
 
 
 @router.get("", response_model=list[AppointmentRead])
+# loads the bookings record.
 def get_bookings(
     db: DbSession,
     patient: CurrentPatient,
@@ -56,6 +63,7 @@ def get_bookings(
     optometrist_id: Annotated[int | None, Query(gt=0)] = None,
     status: Literal["booked", "cancelled"] | None = None,
 ) -> list[Appointment]:
+    # return the patient's appointment history, optionally filtered by clinic, doctor, or status.
     return list_appointments(
         db,
         patient_id=patient.id,
@@ -69,11 +77,13 @@ def get_bookings(
     "/{appointment_id}",
     response_model=AppointmentRead,
 )
+# loads the booking record.
 def get_booking(
     appointment_id: int,
     db: DbSession,
     patient: CurrentPatient,
 ) -> Appointment:
+    # fetch one appointment for the current patient, ensuring ownership is enforced.
     return get_appointment(
         db,
         appointment_id,
@@ -85,11 +95,13 @@ def get_booking(
     "/{appointment_id}/cancel",
     response_model=AppointmentRead,
 )
+# cancels the booking record.
 def cancel_booking(
     appointment_id: int,
     db: DbSession,
     patient: CurrentPatient,
 ) -> Appointment:
+    # cancel a patient-owned appointment and persist the current UTC timestamp.
     return cancel_appointment(
         db,
         appointment_id,

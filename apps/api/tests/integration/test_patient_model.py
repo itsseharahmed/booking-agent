@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from optometry.db.models.patient import Patient
 
 
+# handles the make patient workflow.
 def make_patient(
     *,
     email: str = "patient@example.com",
@@ -20,6 +21,7 @@ def make_patient(
     )
 
 
+# checks that create patient works as expected.
 def test_create_patient(test_session: Session) -> None:
     patient = make_patient()
     test_session.add(patient)
@@ -30,6 +32,7 @@ def test_create_patient(test_session: Session) -> None:
     assert patient.is_active is True
 
 
+# checks that patient email case insensitive unique works as expected.
 def test_patient_email_case_insensitive_unique(
     test_session: Session,
 ) -> None:
@@ -44,6 +47,7 @@ def test_patient_email_case_insensitive_unique(
         test_session.flush()
 
 
+# checks that multiple patients allowed works as expected.
 def test_multiple_patients_allowed(
     test_session: Session,
 ) -> None:
@@ -56,6 +60,7 @@ def test_multiple_patients_allowed(
     assert first.id != second.id
 
 
+# checks that patient can be deactivated works as expected.
 def test_patient_can_be_deactivated(
     test_session: Session,
 ) -> None:
@@ -72,6 +77,7 @@ def test_patient_can_be_deactivated(
     assert stored.is_active is False
 
 
+# checks that patient password hash required works as expected.
 def test_patient_password_hash_required(
     test_session: Session,
 ) -> None:

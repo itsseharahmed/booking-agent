@@ -14,6 +14,7 @@ from optometry.core.security import (
 TEST_SECRET = "test-only-secret-not-for-production"
 
 
+# checks that password is hashed works as expected.
 def test_password_is_hashed() -> None:
     password = "a-secure-test-password"
 
@@ -23,12 +24,14 @@ def test_password_is_hashed() -> None:
     assert verify_password(password, hashed)
 
 
+# checks that wrong password rejected works as expected.
 def test_wrong_password_rejected() -> None:
     hashed = hash_password("correct-password-123")
 
     assert not verify_password("incorrect-password", hashed)
 
 
+# checks that access token contains patient id works as expected.
 def test_access_token_contains_patient_id() -> None:
     token = create_access_token(
         patient_id=42,
@@ -45,6 +48,7 @@ def test_access_token_contains_patient_id() -> None:
     assert payload["type"] == "access"
 
 
+# checks that access token expires works as expected.
 def test_access_token_expires() -> None:
     past = datetime.now(UTC) - timedelta(hours=2)
 

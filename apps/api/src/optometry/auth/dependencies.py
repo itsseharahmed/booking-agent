@@ -1,4 +1,4 @@
-"""FastAPI dependency for authenticated patients."""
+# FastAPI dependency for authenticated patients
 
 from typing import Annotated
 
@@ -14,9 +14,11 @@ from optometry.db.session import get_db
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
+# database session dependency used by this module.
 DbSession = Annotated[Session, Depends(get_db)]
 
 
+# loads the current patient record.
 def get_current_patient(
     db: DbSession,
     credentials: Annotated[

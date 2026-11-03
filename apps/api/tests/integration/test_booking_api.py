@@ -20,7 +20,9 @@ from optometry.db.models.working_schedule import WorkingSchedule
 from optometry.db.session import get_db
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# builds the test client used by the test.
 def client(test_session, monkeypatch):
     monkeypatch.setenv(
         "JWT_SECRET_KEY",
@@ -41,10 +43,12 @@ def client(test_session, monkeypatch):
         secret_key="test-only-secret-not-for-production",
     )
 
+    # creates the api application.
     app = FastAPI()
     app.include_router(appointments_router)
     app.include_router(availability_router)
 
+    # overrides a dependency during the test.
     def override_db():
         yield test_session
 
@@ -55,7 +59,9 @@ def client(test_session, monkeypatch):
         yield test_client
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the booking data workflow.
 def booking_data(test_session):
     clinic = Clinic(
         name="Booking API Test Clinic",
@@ -86,7 +92,7 @@ def booking_data(test_session):
     )
     test_session.flush()
 
-    # Find a future Monday so day_of_week=0 is predictable.
+    # find a future Monday so day_of_week=0 is predictable.
     target = datetime.now(UTC).date() + timedelta(days=21)
     target += timedelta(days=(0 - target.weekday()) % 7)
 
@@ -110,6 +116,7 @@ def booking_data(test_session):
     }
 
 
+# handles the availability params workflow.
 def availability_params(data):
     return {
         "clinic_id": data["clinic_id"],
@@ -119,6 +126,7 @@ def availability_params(data):
     }
 
 
+# handles the first available slot workflow.
 def first_available_slot(client, data):
     response = client.get(
         "/availability",
@@ -130,6 +138,7 @@ def first_available_slot(client, data):
     return slots[0]
 
 
+# handles the booking payload workflow.
 def booking_payload(data, slot):
     return {
         "clinic_id": data["clinic_id"],
@@ -139,6 +148,7 @@ def booking_payload(data, slot):
     }
 
 
+# checks that create booking works as expected.
 def test_create_booking(client, test_session, booking_data):
     slot = first_available_slot(client, booking_data)
 
@@ -151,13 +161,13 @@ def test_create_booking(client, test_session, booking_data):
 
     result = response.json()
 
-    # Verify booking response
+    # verify booking response
     assert result["status"] == "booked"
     assert Decimal(result["appointment_price"]) == Decimal("95.00")
     assert result["start_at"] is not None
     assert result["end_at"] is not None
 
-    # Verify authenticated patient ownership
+    # verify authenticated patient ownership
     appointment = test_session.get(
         Appointment,
         result["id"],
@@ -172,6 +182,7 @@ def test_create_booking(client, test_session, booking_data):
     assert owner.email == "booking-owner@example.com"
 
 
+# checks that booking removes slot from availability works as expected.
 def test_booking_removes_slot_from_availability(client, booking_data):
     slot = first_available_slot(client, booking_data)
 
@@ -191,6 +202,7 @@ def test_booking_removes_slot_from_availability(client, booking_data):
     assert slot["start"] not in starts
 
 
+# checks that duplicate booking rejected works as expected.
 def test_duplicate_booking_rejected(client, booking_data):
     slot = first_available_slot(client, booking_data)
     payload = booking_payload(booking_data, slot)
@@ -202,6 +214,7 @@ def test_duplicate_booking_rejected(client, booking_data):
     assert second.status_code == 409
 
 
+# checks that cancel booking restores slot works as expected.
 def test_cancel_booking_restores_slot(client, booking_data):
     slot = first_available_slot(client, booking_data)
 
@@ -228,6 +241,7 @@ def test_cancel_booking_restores_slot(client, booking_data):
     assert slot["start"] in starts
 
 
+# checks that cancel twice rejected works as expected.
 def test_cancel_twice_rejected(client, booking_data):
     slot = first_available_slot(client, booking_data)
 
@@ -244,6 +258,7 @@ def test_cancel_twice_rejected(client, booking_data):
     assert second.status_code == 409
 
 
+# checks that booking invalid slot rejected works as expected.
 def test_booking_invalid_slot_rejected(client, booking_data):
     slot = first_available_slot(client, booking_data)
     invalid_start = datetime.fromisoformat(slot["start"]) + timedelta(minutes=5)
@@ -256,6 +271,7 @@ def test_booking_invalid_slot_rejected(client, booking_data):
     assert response.status_code == 422
 
 
+# checks that get booking works as expected.
 def test_get_booking(client, booking_data):
     slot = first_available_slot(client, booking_data)
 
@@ -271,6 +287,7 @@ def test_get_booking(client, booking_data):
     assert response.json()["id"] == appointment_id
 
 
+# checks that list bookings works as expected.
 def test_list_bookings(client, booking_data):
     slot = first_available_slot(client, booking_data)
 
@@ -289,11 +306,13 @@ def test_list_bookings(client, booking_data):
     assert len(response.json()) == 1
 
 
+# checks that missing booking returns 404 works as expected.
 def test_missing_booking_returns_404(client):
     response = client.get("/appointments/99999999")
     assert response.status_code == 404
 
 
+# checks that naive datetime rejected works as expected.
 def test_naive_datetime_rejected(client, booking_data):
     slot = first_available_slot(client, booking_data)
     payload = booking_payload(booking_data, slot)
@@ -307,6 +326,7 @@ def test_naive_datetime_rejected(client, booking_data):
     assert response.status_code == 422
 
 
+# checks that booking price is snapshot works as expected.
 def test_booking_price_is_snapshot(client, test_session, booking_data):
     slot = first_available_slot(client, booking_data)
 
@@ -331,6 +351,7 @@ def test_booking_price_is_snapshot(client, test_session, booking_data):
     assert Decimal(response.json()["appointment_price"]) == original_price
 
 
+# checks that cancelled booking stays in history works as expected.
 def test_cancelled_booking_stays_in_history(client, booking_data):
     slot = first_available_slot(client, booking_data)
 
@@ -357,6 +378,7 @@ def test_cancelled_booking_stays_in_history(client, booking_data):
     assert any(item["id"] == appointment_id for item in response.json())
 
 
+# checks that rebooking after cancellation works as expected.
 def test_rebooking_after_cancellation(client, booking_data):
     slot = first_available_slot(client, booking_data)
     payload = booking_payload(booking_data, slot)
@@ -373,6 +395,7 @@ def test_rebooking_after_cancellation(client, booking_data):
     assert replacement.json()["id"] != first.json()["id"]
 
 
+# checks that occupied slot is conflict not invalid time works as expected.
 def test_occupied_slot_is_conflict_not_invalid_time(client, booking_data):
     slot = first_available_slot(client, booking_data)
     payload = booking_payload(booking_data, slot)
@@ -385,6 +408,7 @@ def test_occupied_slot_is_conflict_not_invalid_time(client, booking_data):
     assert second.status_code == 409
 
 
+# checks that booking outside working hours rejected works as expected.
 def test_booking_outside_working_hours_rejected(client, booking_data):
     slot = first_available_slot(client, booking_data)
 
@@ -398,6 +422,7 @@ def test_booking_outside_working_hours_rejected(client, booking_data):
     assert response.status_code == 422
 
 
+# checks that booking with inactive service rejected works as expected.
 def test_booking_with_inactive_service_rejected(client, test_session, booking_data):
     slot = first_available_slot(client, booking_data)
 
@@ -418,11 +443,13 @@ def test_booking_with_inactive_service_rejected(client, test_session, booking_da
     assert response.status_code == 422
 
 
+# checks that cancel missing booking returns 404 works as expected.
 def test_cancel_missing_booking_returns_404(client):
     response = client.post("/appointments/99999999/cancel")
     assert response.status_code == 404
 
 
+# checks that appointment interval is twenty minutes works as expected.
 def test_appointment_interval_is_twenty_minutes(client, booking_data):
     slot = first_available_slot(client, booking_data)
 
@@ -439,6 +466,7 @@ def test_appointment_interval_is_twenty_minutes(client, booking_data):
     assert end - start == timedelta(minutes=20)
 
 
+# checks that booking response uses toronto timezone works as expected.
 def test_booking_response_uses_toronto_timezone(
     client,
     booking_data,

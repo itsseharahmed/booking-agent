@@ -8,6 +8,7 @@ from optometry.core.security import verify_password
 from optometry.db.models.admin import Admin
 
 
+# checks that create admin works as expected.
 def test_create_admin(
     test_session: Session,
 ) -> None:
@@ -27,6 +28,7 @@ def test_create_admin(
     )
 
 
+# checks that create admin rejects duplicate email works as expected.
 def test_create_admin_rejects_duplicate_email(
     test_session: Session,
 ) -> None:
@@ -44,6 +46,7 @@ def test_create_admin_rejects_duplicate_email(
         )
 
 
+# checks that create admin rejects short password works as expected.
 def test_create_admin_rejects_short_password(
     test_session: Session,
 ) -> None:
@@ -55,6 +58,7 @@ def test_create_admin_rejects_short_password(
         )
 
 
+# checks that create admin rejects invalid email works as expected.
 def test_create_admin_rejects_invalid_email(
     test_session: Session,
 ) -> None:
@@ -66,6 +70,7 @@ def test_create_admin_rejects_invalid_email(
         )
 
 
+# checks that create admin does not store plaintext password works as expected.
 def test_create_admin_does_not_store_plaintext_password(
     test_session: Session,
 ) -> None:

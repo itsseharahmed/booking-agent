@@ -1,4 +1,5 @@
 """Administrator accounts."""
+# this file contains the src / optometry / db / models / admin.py logic.
 
 from datetime import datetime
 
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from optometry.db.base import Base
 
 
+# handles the Admin workflow.
 class Admin(Base):
     __tablename__ = "admins"
 

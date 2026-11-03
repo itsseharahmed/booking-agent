@@ -6,11 +6,13 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 
+# handles the AvailabilitySlotRead workflow.
 class AvailabilitySlotRead(BaseModel):
     start: datetime
     end: datetime
 
 
+# handles the AvailabilityRead workflow.
 class AvailabilityRead(BaseModel):
     clinic_id: int
     optometrist_id: int

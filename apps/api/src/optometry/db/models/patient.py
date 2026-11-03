@@ -1,4 +1,5 @@
 """Patient accounts."""
+# this file contains the src / optometry / db / models / patient.py logic.
 
 from datetime import datetime
 
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from optometry.db.base import Base
 
 
+# handles the Patient workflow.
 class Patient(Base):
     __tablename__ = "patients"
 

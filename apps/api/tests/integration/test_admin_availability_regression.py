@@ -27,8 +27,11 @@ from optometry.db.models.working_schedule import WorkingSchedule
 from optometry.db.session import get_db
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# builds the test client used by the test.
 def client(test_session: Session) -> Iterator[TestClient]:
+    # creates the api application.
     app = FastAPI()
     app.include_router(availability_router)
     app.include_router(clinics_router)
@@ -36,6 +39,7 @@ def client(test_session: Session) -> Iterator[TestClient]:
     app.include_router(schedules_router)
     app.include_router(services_router)
 
+    # overrides a dependency during the test.
     def override_db() -> Iterator[Session]:
         yield test_session
 
@@ -59,7 +63,9 @@ def client(test_session: Session) -> Iterator[TestClient]:
     app.dependency_overrides.clear()
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the setup data workflow.
 def setup_data(test_session: Session) -> dict[str, int | date]:
     clinic = Clinic(
         name="Regression Test Clinic",
@@ -89,7 +95,7 @@ def setup_data(test_session: Session) -> dict[str, int | date]:
         )
     )
 
-    # Use a future Monday so the weekday matches the schedule.
+    # use a future Monday so the weekday matches the schedule.
     today = datetime.now(UTC).date()
     days_until_monday = (0 - today.weekday()) % 7
     if days_until_monday == 0:
@@ -118,6 +124,7 @@ def setup_data(test_session: Session) -> dict[str, int | date]:
     }
 
 
+# handles the availability workflow.
 def availability(
     client: TestClient,
     data: dict[str, int | date],
@@ -142,6 +149,7 @@ def availability(
         ("services", "service_id"),
     ],
 )
+# checks that deactivation removes availability works as expected.
 def test_deactivation_removes_availability(
     client: TestClient,
     setup_data: dict[str, int | date],
@@ -174,6 +182,7 @@ def test_deactivation_removes_availability(
         ("services", "service_id"),
     ],
 )
+# checks that reactivation restores availability works as expected.
 def test_reactivation_restores_availability(
     client: TestClient,
     setup_data: dict[str, int | date],
@@ -203,6 +212,7 @@ def test_reactivation_restores_availability(
     assert len(restored.json()["slots"]) > 0
 
 
+# checks that schedule deletion removes availability works as expected.
 def test_schedule_deletion_removes_availability(
     client: TestClient,
     setup_data: dict[str, int | date],
@@ -219,6 +229,7 @@ def test_schedule_deletion_removes_availability(
     assert after.json()["slots"] == []
 
 
+# checks that existing appointment survives deactivation works as expected.
 def test_existing_appointment_survives_deactivation(
     client: TestClient,
     setup_data: dict[str, int | date],
@@ -270,6 +281,7 @@ def test_existing_appointment_survives_deactivation(
     assert persisted.appointment_price == Decimal("95.00")
 
 
+# checks that existing appointment survives schedule deletion works as expected.
 def test_existing_appointment_survives_schedule_deletion(
     client: TestClient,
     setup_data: dict[str, int | date],
@@ -307,6 +319,7 @@ def test_existing_appointment_survives_schedule_deletion(
     assert persisted.status == "booked"
 
 
+# checks that service with appointment cannot be deleted works as expected.
 def test_service_with_appointment_cannot_be_deleted(
     client: TestClient,
     setup_data: dict[str, int | date],

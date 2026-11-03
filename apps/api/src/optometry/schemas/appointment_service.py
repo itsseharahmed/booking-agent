@@ -12,6 +12,7 @@ from pydantic import (
 )
 
 
+# handles the normalize service name workflow.
 def normalize_service_name(value: str) -> str:
     cleaned = " ".join(value.split())
 
@@ -24,16 +25,19 @@ def normalize_service_name(value: str) -> str:
     return cleaned
 
 
+# handles the AppointmentServiceCreate workflow.
 class AppointmentServiceCreate(BaseModel):
     name: str = Field(min_length=1, max_length=150)
     description: str | None = None
 
     @field_validator("name", mode="before")
     @classmethod
+    # validates the name input.
     def validate_name(cls, value: str) -> str:
         return normalize_service_name(value)
 
 
+# handles the AppointmentServiceUpdate workflow.
 class AppointmentServiceUpdate(BaseModel):
     name: str | None = Field(
         default=None,
@@ -45,12 +49,14 @@ class AppointmentServiceUpdate(BaseModel):
 
     @field_validator("name", mode="before")
     @classmethod
+    # validates the name input.
     def validate_name(cls, value: str | None) -> str | None:
         if value is None:
             return None
         return normalize_service_name(value)
 
     @model_validator(mode="after")
+    # handles the reject invalid nulls workflow.
     def reject_invalid_nulls(self) -> Self:
         for field_name in self.model_fields_set:
             if field_name != "description" and getattr(self, field_name) is None:
@@ -59,6 +65,7 @@ class AppointmentServiceUpdate(BaseModel):
         return self
 
 
+# handles the AppointmentServiceRead workflow.
 class AppointmentServiceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

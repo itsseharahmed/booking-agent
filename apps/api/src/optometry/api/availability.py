@@ -1,4 +1,4 @@
-"""Read-only appointment availability API."""
+# read-only appointment availability API.
 
 from datetime import UTC, date, datetime
 from typing import Annotated
@@ -14,12 +14,15 @@ from optometry.schemas.availability import (
     AvailabilitySlotRead,
 )
 
+# router for this api module.
 router = APIRouter(prefix="/availability", tags=["Availability"])
 
+# database session dependency used by this module.
 DbSession = Annotated[Session, Depends(get_db)]
 
 
 @router.get("", response_model=AvailabilityRead)
+# lists all availability records.
 def list_availability(
     db: DbSession,
     clinic_id: Annotated[int, Query(gt=0)],
@@ -50,6 +53,7 @@ def list_availability(
     )
 
 
+# loads the current time record.
 def get_current_time() -> datetime:
     """Provide a replaceable UTC clock for availability queries."""
     return datetime.now(UTC)

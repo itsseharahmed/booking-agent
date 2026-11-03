@@ -6,6 +6,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
+# handles the ClinicCreate workflow.
 class ClinicCreate(BaseModel):
     """Validate data required to create a clinic."""
 
@@ -27,6 +28,7 @@ class ClinicCreate(BaseModel):
 
     @field_validator("timezone")
     @classmethod
+    # validates the timezone input.
     def validate_timezone(cls, value: str) -> str:
         """Require the same timezone for all clinic locations."""
         if value != "America/Toronto":
@@ -42,6 +44,7 @@ class ClinicCreate(BaseModel):
         "postal_code",
     )
     @classmethod
+    # validates the required text input.
     def validate_required_text(cls, value: str) -> str:
         """Remove surrounding whitespace and reject empty text."""
         cleaned = value.strip()
@@ -52,6 +55,7 @@ class ClinicCreate(BaseModel):
         return cleaned
 
 
+# handles the ClinicRead workflow.
 class ClinicRead(BaseModel):
     """Define the clinic data returned by the API."""
 
@@ -73,6 +77,7 @@ class ClinicRead(BaseModel):
     appointment_price: Decimal
 
 
+# handles the ClinicAppointmentPriceUpdate workflow.
 class ClinicAppointmentPriceUpdate(BaseModel):
     """Update a clinic's standard appointment price."""
 
@@ -83,6 +88,7 @@ class ClinicAppointmentPriceUpdate(BaseModel):
     )
 
 
+# handles the ClinicUpdate workflow.
 class ClinicUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=150)
     address_line1: str | None = Field(default=None, min_length=1)
@@ -95,6 +101,7 @@ class ClinicUpdate(BaseModel):
     is_active: bool | None = None
 
     @model_validator(mode="after")
+    # validates the update input.
     def validate_update(self) -> "ClinicUpdate":
         if not self.model_fields_set:
             raise ValueError("At least one field must be provided")

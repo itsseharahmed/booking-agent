@@ -21,12 +21,16 @@ from optometry.db.models.working_schedule import WorkingSchedule
 from optometry.db.session import get_db
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# builds the test client used by the test.
 def client(test_session: Session) -> Iterator[TestClient]:
+    # creates the api application.
     app = FastAPI()
     app.include_router(schedules_router)
     app.include_router(services_router)
 
+    # overrides a dependency during the test.
     def override_db() -> Iterator[Session]:
         yield test_session
 
@@ -50,7 +54,9 @@ def client(test_session: Session) -> Iterator[TestClient]:
     app.dependency_overrides.clear()
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the clinic workflow.
 def clinic(test_session: Session) -> Clinic:
     record = Clinic(
         name="Schedule Admin Clinic",
@@ -65,7 +71,9 @@ def clinic(test_session: Session) -> Clinic:
     return record
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the optometrist workflow.
 def optometrist(test_session: Session) -> Optometrist:
     record = Optometrist(
         first_name="Schedule",
@@ -76,7 +84,9 @@ def optometrist(test_session: Session) -> Optometrist:
     return record
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the schedule workflow.
 def schedule(
     test_session: Session,
     clinic: Clinic,
@@ -103,7 +113,9 @@ def schedule(
     return record
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the service workflow.
 def service(test_session: Session) -> AppointmentService:
     record = AppointmentService(
         name="Schedule Admin Eye Exam",
@@ -115,6 +127,7 @@ def service(test_session: Session) -> AppointmentService:
     return record
 
 
+# checks that delete schedule works as expected.
 def test_delete_schedule(
     client: TestClient,
     schedule: WorkingSchedule,
@@ -128,12 +141,14 @@ def test_delete_schedule(
     assert test_session.get(WorkingSchedule, schedule_id) is None
 
 
+# checks that delete missing schedule works as expected.
 def test_delete_missing_schedule(client: TestClient) -> None:
     response = client.delete("/schedules/99999999")
 
     assert response.status_code == 404
 
 
+# checks that deactivate schedule works as expected.
 def test_deactivate_schedule(
     client: TestClient,
     schedule: WorkingSchedule,
@@ -147,6 +162,7 @@ def test_deactivate_schedule(
     assert response.json()["is_active"] is False
 
 
+# checks that reactivate schedule works as expected.
 def test_reactivate_schedule(
     client: TestClient,
     schedule: WorkingSchedule,
@@ -165,6 +181,7 @@ def test_reactivate_schedule(
     assert second.json()["is_active"] is True
 
 
+# checks that reactivate overlapping schedule rejected works as expected.
 def test_reactivate_overlapping_schedule_rejected(
     client: TestClient,
     schedule: WorkingSchedule,
@@ -195,6 +212,7 @@ def test_reactivate_overlapping_schedule_rejected(
     assert response.status_code == 409
 
 
+# checks that delete service works as expected.
 def test_delete_service(
     client: TestClient,
     service: AppointmentService,
@@ -208,12 +226,14 @@ def test_delete_service(
     assert test_session.get(AppointmentService, service_id) is None
 
 
+# checks that delete missing service works as expected.
 def test_delete_missing_service(client: TestClient) -> None:
     response = client.delete("/services/99999999")
 
     assert response.status_code == 404
 
 
+# checks that deactivate service works as expected.
 def test_deactivate_service(
     client: TestClient,
     service: AppointmentService,
@@ -227,6 +247,7 @@ def test_deactivate_service(
     assert response.json()["is_active"] is False
 
 
+# checks that reactivate service works as expected.
 def test_reactivate_service(
     client: TestClient,
     service: AppointmentService,

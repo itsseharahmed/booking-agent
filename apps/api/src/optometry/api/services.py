@@ -1,4 +1,4 @@
-"""Appointment service catalog API."""
+# Appointment service catalog API.
 
 from typing import Annotated
 
@@ -16,8 +16,10 @@ from optometry.schemas.appointment_service import (
     AppointmentServiceUpdate,
 )
 
+# router for this api module.
 router = APIRouter(prefix="/services", tags=["Services"])
 
+# database session dependency used by this module.
 DbSession = Annotated[Session, Depends(get_db)]
 
 
@@ -27,6 +29,7 @@ DbSession = Annotated[Session, Depends(get_db)]
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(get_current_admin)],
 )
+# creates a new service.
 def create_service(
     payload: AppointmentServiceCreate,
     db: DbSession,
@@ -48,6 +51,7 @@ def create_service(
 
 
 @router.get("", response_model=list[AppointmentServiceRead])
+# lists all services records.
 def list_services(
     db: DbSession,
     active_only: bool = False,
@@ -62,6 +66,7 @@ def list_services(
 
 
 @router.get("/{service_id}", response_model=AppointmentServiceRead)
+# loads the service record.
 def get_service(
     service_id: int,
     db: DbSession,
@@ -79,6 +84,7 @@ def get_service(
     response_model=AppointmentServiceRead,
     dependencies=[Depends(get_current_admin)],
 )
+# updates the service record.
 def update_service(
     service_id: int,
     payload: AppointmentServiceUpdate,
@@ -110,6 +116,7 @@ def update_service(
     status_code=204,
     dependencies=[Depends(get_current_admin)],
 )
+# deletes the service record.
 def delete_service(
     service_id: int,
     db: DbSession,

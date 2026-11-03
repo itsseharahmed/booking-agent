@@ -1,4 +1,4 @@
-"""Patient registration and authentication."""
+# Patient registration and authentication.
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
@@ -10,6 +10,7 @@ from optometry.db.models.patient import Patient
 from optometry.schemas.auth import PatientLogin, PatientRegister
 
 
+# registers a new patient.
 def register_patient(
     db: Session,
     payload: PatientRegister,
@@ -47,6 +48,7 @@ def register_patient(
     return patient
 
 
+# validates the patient credentials.
 def authenticate_patient(
     db: Session,
     payload: PatientLogin,

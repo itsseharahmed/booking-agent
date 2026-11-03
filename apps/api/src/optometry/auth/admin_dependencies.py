@@ -1,4 +1,4 @@
-"""FastAPI dependency for authenticated administrators."""
+# FastAPI dependency for authenticated administrators.
 
 from typing import Annotated
 
@@ -14,9 +14,11 @@ from optometry.db.session import get_db
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
+# database session dependency used by this module.
 DbSession = Annotated[Session, Depends(get_db)]
 
 
+# loads the current admin record.
 def get_current_admin(
     db: DbSession,
     credentials: Annotated[
@@ -46,7 +48,7 @@ def get_current_admin(
     if payload.get("type") != "access":
         raise unauthorized
 
-    # A valid patient token must never authorize an admin operation.
+    # a valid patient token must never authorize an admin operation.
     if payload.get("role") != "admin":
         raise HTTPException(
             status_code=403,

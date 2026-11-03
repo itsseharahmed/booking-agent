@@ -15,8 +15,11 @@ from optometry.db.session import get_db
 from optometry.main import app
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# builds the test client used by the test.
 def client(test_session: Session):
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -29,7 +32,9 @@ def client(test_session: Session):
         app.dependency_overrides.clear()
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the availability data workflow.
 def availability_data(test_session: Session):
     clinic = Clinic(
         name="Availability Test Clinic",
@@ -81,6 +86,7 @@ def availability_data(test_session: Session):
     }
 
 
+# handles the availability params workflow.
 def availability_params(data):
     return {
         "clinic_id": data["clinic"].id,
@@ -90,6 +96,7 @@ def availability_params(data):
     }
 
 
+# checks that returns available slots works as expected.
 def test_returns_available_slots(client, availability_data):
     response = client.get(
         "/availability",
@@ -109,6 +116,7 @@ def test_returns_available_slots(client, availability_data):
     )
 
 
+# checks that inactive clinic returns no slots works as expected.
 def test_inactive_clinic_returns_no_slots(client, test_session, availability_data):
     availability_data["clinic"].is_active = False
     test_session.flush()
@@ -122,6 +130,7 @@ def test_inactive_clinic_returns_no_slots(client, test_session, availability_dat
     assert response.json()["slots"] == []
 
 
+# checks that inactive optometrist returns no slots works as expected.
 def test_inactive_optometrist_returns_no_slots(client, test_session, availability_data):
     availability_data["optometrist"].is_active = False
     test_session.flush()
@@ -135,6 +144,7 @@ def test_inactive_optometrist_returns_no_slots(client, test_session, availabilit
     assert response.json()["slots"] == []
 
 
+# checks that inactive service returns no slots works as expected.
 def test_inactive_service_returns_no_slots(client, test_session, availability_data):
     availability_data["service"].is_active = False
     test_session.flush()
@@ -148,6 +158,7 @@ def test_inactive_service_returns_no_slots(client, test_session, availability_da
     assert response.json()["slots"] == []
 
 
+# checks that inactive schedule returns no slots works as expected.
 def test_inactive_schedule_returns_no_slots(client, test_session, availability_data):
     schedule = (
         test_session.query(WorkingSchedule)
@@ -166,6 +177,7 @@ def test_inactive_schedule_returns_no_slots(client, test_session, availability_d
     assert response.json()["slots"] == []
 
 
+# checks that missing clinic returns 404 works as expected.
 def test_missing_clinic_returns_404(client, availability_data):
     params = availability_params(availability_data)
     params["clinic_id"] = 999999
@@ -175,6 +187,7 @@ def test_missing_clinic_returns_404(client, availability_data):
     assert response.status_code == 404
 
 
+# checks that missing service returns 404 works as expected.
 def test_missing_service_returns_404(client, availability_data):
     params = availability_params(availability_data)
     params["service_id"] = 999999
@@ -184,6 +197,7 @@ def test_missing_service_returns_404(client, availability_data):
     assert response.status_code == 404
 
 
+# checks that invalid ids return 422 works as expected.
 def test_invalid_ids_return_422(client):
     response = client.get(
         "/availability",
@@ -198,12 +212,14 @@ def test_invalid_ids_return_422(client):
     assert response.status_code == 422
 
 
+# checks that missing parameters return 422 works as expected.
 def test_missing_parameters_return_422(client):
     response = client.get("/availability")
 
     assert response.status_code == 422
 
 
+# checks that missing optometrist returns 404 works as expected.
 def test_missing_optometrist_returns_404(client, availability_data):
     params = availability_params(availability_data)
     params["optometrist_id"] = 999999
@@ -213,10 +229,11 @@ def test_missing_optometrist_returns_404(client, availability_data):
     assert response.status_code == 404
 
 
+# checks that unassigned optometrist returns no slots works as expected.
 def test_unassigned_optometrist_returns_no_slots(
     client, test_session, availability_data
 ):
-    # Create an optometrist who is not assigned to the clinic.
+    # create an optometrist who is not assigned to the clinic.
     unassigned = Optometrist(
         first_name="Unassigned",
         last_name="Optometrist",
@@ -237,6 +254,7 @@ def test_unassigned_optometrist_returns_no_slots(
     assert response.json()["slots"] == []
 
 
+# checks that day without schedule returns no slots works as expected.
 def test_day_without_schedule_returns_no_slots(client, availability_data):
     params = availability_params(availability_data)
     params["appointment_date"] = (
@@ -249,6 +267,7 @@ def test_day_without_schedule_returns_no_slots(client, availability_data):
     assert response.json()["slots"] == []
 
 
+# checks that past date returns no slots works as expected.
 def test_past_date_returns_no_slots(client, availability_data):
     params = availability_params(availability_data)
     params["appointment_date"] = "2020-01-01"

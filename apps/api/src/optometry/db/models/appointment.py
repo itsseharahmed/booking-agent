@@ -1,4 +1,5 @@
 """Persisted appointment bookings."""
+# this file contains the src / optometry / db / models / appointment.py logic.
 
 from datetime import datetime
 from decimal import Decimal
@@ -19,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from optometry.db.base import Base
 
 
+# handles the Appointment workflow.
 class Appointment(Base):
     __tablename__ = "appointments"
 

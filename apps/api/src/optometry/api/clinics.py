@@ -1,4 +1,4 @@
-"""API endpoints for managing optometry clinic locations."""
+# API endpoints for managing optometry clinic locations.
 
 from typing import Annotated
 
@@ -17,9 +17,10 @@ from optometry.schemas.clinic import (
     ClinicUpdate,
 )
 
+# router for this api module.
 router = APIRouter(prefix="/clinics", tags=["Clinics"])
 
-# FastAPI injects a database session into each endpoint.
+# fastAPI injects a database session into each endpoint.
 DatabaseSession = Annotated[Session, Depends(get_db)]
 
 
@@ -29,6 +30,7 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(get_current_admin)],
 )
+# creates a new clinic.
 def create_clinic(clinic_data: ClinicCreate, db: DatabaseSession) -> Clinic:
     """Create a clinic and persist it to PostgreSQL."""
     clinic = Clinic(**clinic_data.model_dump())
@@ -41,6 +43,7 @@ def create_clinic(clinic_data: ClinicCreate, db: DatabaseSession) -> Clinic:
 
 
 @router.get("", response_model=list[ClinicRead])
+# lists all clinics records.
 def list_clinics(
     db: DatabaseSession,
     active_only: bool = False,
@@ -49,17 +52,18 @@ def list_clinics(
 
     statement = select(Clinic)
 
-    # Exclude inactive clinics when requested.
+    # exclude inactive clinics when requested.
     if active_only:
         statement = statement.where(Clinic.is_active.is_(True))
 
-    # Keep results ordered consistently by clinic ID.
+    # keep results ordered consistently by clinic ID.
     statement = statement.order_by(Clinic.id)
 
     return list(db.scalars(statement).all())
 
 
 @router.get("/{clinic_id}", response_model=ClinicRead)
+# loads the clinic record.
 def get_clinic(clinic_id: int, db: DatabaseSession) -> Clinic:
     """Retrieve a clinic by ID or return a 404 response."""
     clinic = db.get(Clinic, clinic_id)
@@ -78,6 +82,7 @@ def get_clinic(clinic_id: int, db: DatabaseSession) -> Clinic:
     response_model=ClinicRead,
     dependencies=[Depends(get_current_admin)],
 )
+# updates the clinic appointment price record.
 def update_clinic_appointment_price(
     clinic_id: int,
     payload: ClinicAppointmentPriceUpdate,
@@ -105,6 +110,7 @@ def update_clinic_appointment_price(
     response_model=ClinicRead,
     dependencies=[Depends(get_current_admin)],
 )
+# updates the clinic record.
 def update_clinic(
     clinic_id: int,
     payload: ClinicUpdate,
@@ -128,6 +134,7 @@ def update_clinic(
     status_code=204,
     dependencies=[Depends(get_current_admin)],
 )
+# deletes the clinic record.
 def delete_clinic(
     clinic_id: int,
     db: DatabaseSession,

@@ -18,12 +18,16 @@ from optometry.db.models.optometrist_clinic import OptometristClinic
 from optometry.db.session import get_db
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# builds the test client used by the test.
 def client(test_session: Session) -> Iterator[TestClient]:
+    # creates the api application.
     app = FastAPI()
     app.include_router(clinics_router)
     app.include_router(optometrists_router)
 
+    # overrides a dependency during the test.
     def override_db() -> Iterator[Session]:
         yield test_session
 
@@ -49,7 +53,9 @@ def client(test_session: Session) -> Iterator[TestClient]:
     app.dependency_overrides.clear()
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the clinic workflow.
 def clinic(test_session: Session) -> Clinic:
     record = Clinic(
         name="Test Eye Clinic",
@@ -64,7 +70,9 @@ def clinic(test_session: Session) -> Clinic:
     return record
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the optometrist workflow.
 def optometrist(test_session: Session) -> Optometrist:
     record = Optometrist(
         first_name="Jane",
@@ -75,6 +83,7 @@ def optometrist(test_session: Session) -> Optometrist:
     return record
 
 
+# checks that update clinic name works as expected.
 def test_update_clinic_name(
     client: TestClient,
     clinic: Clinic,
@@ -88,6 +97,7 @@ def test_update_clinic_name(
     assert response.json()["name"] == "Updated Eye Clinic"
 
 
+# checks that deactivate clinic works as expected.
 def test_deactivate_clinic(
     client: TestClient,
     clinic: Clinic,
@@ -101,6 +111,7 @@ def test_deactivate_clinic(
     assert response.json()["is_active"] is False
 
 
+# checks that reactivate clinic works as expected.
 def test_reactivate_clinic(
     client: TestClient,
     clinic: Clinic,
@@ -119,6 +130,7 @@ def test_reactivate_clinic(
     assert second.json()["is_active"] is True
 
 
+# checks that delete unassigned clinic works as expected.
 def test_delete_unassigned_clinic(
     client: TestClient,
     clinic: Clinic,
@@ -132,6 +144,7 @@ def test_delete_unassigned_clinic(
     assert test_session.get(Clinic, clinic_id) is None
 
 
+# checks that delete assigned clinic rejected works as expected.
 def test_delete_assigned_clinic_rejected(
     client: TestClient,
     clinic: Clinic,
@@ -152,6 +165,7 @@ def test_delete_assigned_clinic_rejected(
     assert test_session.get(Clinic, clinic.id) is not None
 
 
+# checks that update missing clinic works as expected.
 def test_update_missing_clinic(client: TestClient) -> None:
     response = client.patch(
         "/clinics/99999999",
@@ -161,12 +175,14 @@ def test_update_missing_clinic(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+# checks that delete missing clinic works as expected.
 def test_delete_missing_clinic(client: TestClient) -> None:
     response = client.delete("/clinics/99999999")
 
     assert response.status_code == 404
 
 
+# checks that reject null clinic name works as expected.
 def test_reject_null_clinic_name(
     client: TestClient,
     clinic: Clinic,
@@ -179,6 +195,7 @@ def test_reject_null_clinic_name(
     assert response.status_code == 422
 
 
+# checks that reject empty clinic update works as expected.
 def test_reject_empty_clinic_update(
     client: TestClient,
     clinic: Clinic,
@@ -191,6 +208,7 @@ def test_reject_empty_clinic_update(
     assert response.status_code == 422
 
 
+# checks that update optometrist name works as expected.
 def test_update_optometrist_name(
     client: TestClient,
     optometrist: Optometrist,
@@ -204,6 +222,7 @@ def test_update_optometrist_name(
     assert response.json()["first_name"] == "Janet"
 
 
+# checks that deactivate optometrist works as expected.
 def test_deactivate_optometrist(
     client: TestClient,
     optometrist: Optometrist,
@@ -217,6 +236,7 @@ def test_deactivate_optometrist(
     assert response.json()["is_active"] is False
 
 
+# checks that reactivate optometrist works as expected.
 def test_reactivate_optometrist(
     client: TestClient,
     optometrist: Optometrist,
@@ -235,6 +255,7 @@ def test_reactivate_optometrist(
     assert second.json()["is_active"] is True
 
 
+# checks that delete unassigned optometrist works as expected.
 def test_delete_unassigned_optometrist(
     client: TestClient,
     optometrist: Optometrist,
@@ -248,6 +269,7 @@ def test_delete_unassigned_optometrist(
     assert test_session.get(Optometrist, optometrist_id) is None
 
 
+# checks that delete assigned optometrist rejected works as expected.
 def test_delete_assigned_optometrist_rejected(
     client: TestClient,
     clinic: Clinic,
@@ -268,6 +290,7 @@ def test_delete_assigned_optometrist_rejected(
     assert test_session.get(Optometrist, optometrist.id) is not None
 
 
+# checks that update missing optometrist works as expected.
 def test_update_missing_optometrist(
     client: TestClient,
 ) -> None:
@@ -279,6 +302,7 @@ def test_update_missing_optometrist(
     assert response.status_code == 404
 
 
+# checks that delete missing optometrist works as expected.
 def test_delete_missing_optometrist(
     client: TestClient,
 ) -> None:
@@ -287,6 +311,7 @@ def test_delete_missing_optometrist(
     assert response.status_code == 404
 
 
+# checks that reject null optometrist name works as expected.
 def test_reject_null_optometrist_name(
     client: TestClient,
     optometrist: Optometrist,
@@ -299,6 +324,7 @@ def test_reject_null_optometrist_name(
     assert response.status_code == 422
 
 
+# checks that reject empty optometrist update works as expected.
 def test_reject_empty_optometrist_update(
     client: TestClient,
     optometrist: Optometrist,

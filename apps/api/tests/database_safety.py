@@ -1,6 +1,7 @@
 """Safety checks used by PostgreSQL integration tests."""
 
 
+# validates the test database name input.
 def validate_test_database_name(database_name: str) -> None:
     """Reject databases other than the dedicated test database."""
 

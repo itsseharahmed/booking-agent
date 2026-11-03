@@ -11,10 +11,12 @@ from optometry.db.models.appointment_service import AppointmentService
 from optometry.db.models.clinic import Clinic
 
 
+# checks that global appointment duration works as expected.
 def test_global_appointment_duration() -> None:
     assert APPOINTMENT_DURATION_MINUTES == 20
 
 
+# checks that create service works as expected.
 def test_create_service(test_session: Session) -> None:
     service = AppointmentService(
         name="Comprehensive Eye Exam",
@@ -29,6 +31,7 @@ def test_create_service(test_session: Session) -> None:
     assert service.is_active is True
 
 
+# checks that service can be deactivated works as expected.
 def test_service_can_be_deactivated(test_session: Session) -> None:
     service = AppointmentService(
         name="Contact Lens Assessment",
@@ -44,6 +47,7 @@ def test_service_can_be_deactivated(test_session: Session) -> None:
     assert service.is_active is False
 
 
+# checks that duplicate service name rejected works as expected.
 def test_duplicate_service_name_rejected(
     test_session: Session,
 ) -> None:
@@ -55,6 +59,7 @@ def test_duplicate_service_name_rejected(
         test_session.flush()
 
 
+# checks that clinic specific appointment price works as expected.
 def test_clinic_specific_appointment_price(
     test_session: Session,
 ) -> None:
@@ -76,6 +81,7 @@ def test_clinic_specific_appointment_price(
     assert clinic.appointment_price == Decimal("120.00")
 
 
+# checks that negative clinic price rejected works as expected.
 def test_negative_clinic_price_rejected(
     test_session: Session,
 ) -> None:
@@ -95,6 +101,7 @@ def test_negative_clinic_price_rejected(
         test_session.flush()
 
 
+# checks that different clinics can have different prices works as expected.
 def test_different_clinics_can_have_different_prices(
     test_session: Session,
 ) -> None:

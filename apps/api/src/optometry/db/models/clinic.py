@@ -1,4 +1,5 @@
 """SQLAlchemy model for optometry clinic locations."""
+# this file contains the src / optometry / db / models / clinic.py logic.
 
 from datetime import datetime
 from decimal import Decimal
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from optometry.db.base import Base
 
 
+# handles the Clinic workflow.
 class Clinic(Base):
     """Represent a physical clinic where appointments can be booked."""
 
@@ -23,10 +25,10 @@ class Clinic(Base):
             name="ck_clinics_nonnegative_appointment_price",
         ),
     )
-    # Unique identifier for each clinic.
+    # unique identifier for each clinic.
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    # Clinic identity and address.
+    # clinic identity and address.
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     address_line1: Mapped[str] = mapped_column(String(200), nullable=False)
     address_line2: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -35,16 +37,16 @@ class Clinic(Base):
     postal_code: Mapped[str] = mapped_column(String(20), nullable=False)
     country: Mapped[str] = mapped_column(String(2), nullable=False, default="CA")
 
-    # Contact details and local scheduling timezone.
+    # contact details and local scheduling timezone.
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     timezone: Mapped[str] = mapped_column(
         String(64), nullable=False, default="America/Toronto"
     )
 
-    # Inactive clinics remain in the database but cannot accept new bookings.
+    # inactive clinics remain in the database but cannot accept new bookings.
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    # Database-managed timestamps.
+    # database-managed timestamps.
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

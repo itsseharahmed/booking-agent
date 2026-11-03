@@ -21,8 +21,11 @@ from optometry.db.session import get_db
 from optometry.main import app
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# builds the test client used by the test.
 def client(test_session: Session) -> Iterator[TestClient]:
+    # overrides a dependency during the test.
     def override_db() -> Iterator[Session]:
         yield test_session
 
@@ -35,6 +38,7 @@ def client(test_session: Session) -> Iterator[TestClient]:
         app.dependency_overrides.clear()
 
 
+# checks that admin endpoint requires authentication works as expected.
 def test_admin_endpoint_requires_authentication(
     client: TestClient,
 ) -> None:
@@ -46,6 +50,7 @@ def test_admin_endpoint_requires_authentication(
     assert response.status_code == 401
 
 
+# checks that patient token cannot access admin endpoint works as expected.
 def test_patient_token_cannot_access_admin_endpoint(
     client: TestClient,
 ) -> None:
@@ -63,6 +68,7 @@ def test_patient_token_cannot_access_admin_endpoint(
     assert response.status_code == 403
 
 
+# checks that admin token can reach endpoint validation works as expected.
 def test_admin_token_can_reach_endpoint_validation(
     client: TestClient,
     test_session: Session,
@@ -86,10 +92,11 @@ def test_admin_token_can_reach_endpoint_validation(
         headers={"Authorization": f"Bearer {token}"},
     )
 
-    # Authentication succeeded; invalid clinic data is rejected.
+    # authentication succeeded; invalid clinic data is rejected.
     assert response.status_code == 422
 
 
+# checks that invalid admin token is rejected works as expected.
 def test_invalid_admin_token_is_rejected(
     client: TestClient,
 ) -> None:
@@ -102,6 +109,7 @@ def test_invalid_admin_token_is_rejected(
     assert response.status_code == 401
 
 
+# checks that admin token cannot access patient endpoint works as expected.
 def test_admin_token_cannot_access_patient_endpoint(
     client: TestClient,
     test_session: Session,
@@ -119,8 +127,7 @@ def test_admin_token_cannot_access_patient_endpoint(
     test_session.add(patient)
     test_session.flush()
 
-    # Use the patient's numeric ID as the admin token subject.
-    # This proves matching IDs cannot bypass role isolation.
+    # this proves matching IDs cannot bypass role isolation.
     token = create_admin_access_token(
         admin_id=patient.id,
         secret_key=get_jwt_secret_key(),
@@ -134,6 +141,7 @@ def test_admin_token_cannot_access_patient_endpoint(
     assert response.status_code == 401
 
 
+# checks that expired admin token is rejected works as expected.
 def test_expired_admin_token_is_rejected(
     client: TestClient,
 ) -> None:
@@ -161,6 +169,7 @@ def test_expired_admin_token_is_rejected(
     assert response.status_code == 401
 
 
+# checks that inactive admin is rejected works as expected.
 def test_inactive_admin_is_rejected(
     client: TestClient,
     test_session: Session,
@@ -188,6 +197,7 @@ def test_inactive_admin_is_rejected(
     assert response.status_code == 401
 
 
+# checks that nonexistent admin is rejected works as expected.
 def test_nonexistent_admin_is_rejected(
     client: TestClient,
 ) -> None:
@@ -206,7 +216,7 @@ def test_nonexistent_admin_is_rejected(
     assert response.status_code == 401
 
 
-# Administrative write operations that must require an admin JWT.
+# administrative write operations that must require an admin JWT.
 ADMIN_WRITE_ENDPOINTS = [
     ("POST", "/clinics"),
     ("PATCH", "/clinics/999999"),
@@ -226,6 +236,7 @@ ADMIN_WRITE_ENDPOINTS = [
 
 
 @pytest.mark.parametrize("method,path", ADMIN_WRITE_ENDPOINTS)
+# checks that admin write endpoint requires authentication works as expected.
 def test_admin_write_endpoint_requires_authentication(
     client: TestClient,
     method: str,
@@ -246,6 +257,7 @@ def test_admin_write_endpoint_requires_authentication(
 
 
 @pytest.mark.parametrize("method,path", ADMIN_WRITE_ENDPOINTS)
+# checks that patient cannot access admin write endpoint works as expected.
 def test_patient_cannot_access_admin_write_endpoint(
     client: TestClient,
     method: str,

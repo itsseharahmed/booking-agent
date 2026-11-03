@@ -1,4 +1,4 @@
-"""Pure appointment availability calculations."""
+# Pure appointment availability calculations.
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
@@ -10,26 +10,30 @@ CLINIC_TIMEZONE = ZoneInfo("America/Toronto")
 
 
 @dataclass(frozen=True)
+# stores a single appointment time range as a start and end datetime.
 class AvailabilitySlot:
     start: datetime
     end: datetime
 
 
+# resolves a local Toronto time into a real timezone-aware datetime or rejects invalid cases.
 def _valid_local_datetime(
     local_date: date,
     local_time: time,
 ) -> datetime | None:
     """Resolve an unambiguous, existing Toronto local time."""
+    # combine the date and time into a naive local datetime before checking timezone rules.
     naive = datetime.combine(local_date, local_time)
 
+    # test both fold values so ambiguous DST times are detected correctly.
     first = naive.replace(tzinfo=CLINIC_TIMEZONE, fold=0)
     second = naive.replace(tzinfo=CLINIC_TIMEZONE, fold=1)
 
-    # Reject ambiguous times during the fall DST transition.
+    # reject ambiguous times during the fall DST transition.
     if first.utcoffset() != second.utcoffset():
         return None
 
-    # Reject nonexistent times during the spring DST transition.
+    # reject nonexistent times during the spring DST transition.
     round_trip = first.astimezone(UTC).astimezone(CLINIC_TIMEZONE)
 
     if round_trip.replace(tzinfo=None) != naive:
@@ -38,6 +42,7 @@ def _valid_local_datetime(
     return first
 
 
+# builds every possible appointment start time inside a shift.
 def generate_slots(
     *,
     appointment_date: date,
@@ -45,27 +50,26 @@ def generate_slots(
     shift_end: time,
     now: datetime | None = None,
 ) -> list[AvailabilitySlot]:
-    """Generate 20-minute appointments within one working shift.
-
-    Slots are anchored to the beginning of the shift.
-    Partial appointments are excluded.
-    Past slots are excluded when `now` is provided.
-    Ambiguous and nonexistent local times are excluded.
-    """
+    # a shift must start before it ends or the calendar logic would be invalid.
     if shift_start >= shift_end:
         raise ValueError("Shift start must precede shift end")
 
+    # the current time must include a timezone if it is passed in.
     if now is not None and (now.tzinfo is None or now.utcoffset() is None):
         raise ValueError("now must be timezone-aware")
 
+    # appointment duration is fixed by the project rule.
     duration = timedelta(minutes=APPOINTMENT_DURATION_MINUTES)
 
+    # the cursor moves forward in equal appointment-length steps across the shift.
     cursor = datetime.combine(appointment_date, shift_start)
     shift_finish = datetime.combine(appointment_date, shift_end)
 
     slots: list[AvailabilitySlot] = []
 
+    # keep generating slots while one full appointment still fits into the shift.
     while cursor + duration <= shift_finish:
+        # check the actual start and end local times for DST correctness.
         start = _valid_local_datetime(
             appointment_date,
             cursor.time(),
@@ -75,6 +79,7 @@ def generate_slots(
             (cursor + duration).time(),
         )
 
+        # only keep slots when both times are valid and this slot is in the future.
         if start is not None and end is not None:
             elapsed = end.astimezone(UTC) - start.astimezone(UTC)
 
@@ -86,15 +91,12 @@ def generate_slots(
     return slots
 
 
+# removes every slot that overlaps with an already booked appointment period.
 def exclude_occupied_slots(
     slots: list[AvailabilitySlot],
     occupied: list[AvailabilitySlot],
 ) -> list[AvailabilitySlot]:
-    """Exclude slots overlapping any occupied interval.
-
-    Intervals are half-open: [start, end).
-    Adjacent appointments therefore do not overlap.
-    """
+    # validate each occupied range before comparing it to available slots.
     for interval in occupied:
         if (
             interval.start.tzinfo is None
@@ -107,6 +109,7 @@ def exclude_occupied_slots(
         if interval.start >= interval.end:
             raise ValueError("Occupied interval must have positive duration")
 
+    # keep only the free intervals that do not overlap with any occupied block.
     return [
         slot
         for slot in slots

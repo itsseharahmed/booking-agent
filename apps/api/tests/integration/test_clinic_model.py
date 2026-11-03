@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from optometry.db.models.clinic import Clinic
 
 
+# checks that clinics table exists works as expected.
 def test_clinics_table_exists(test_engine: Engine) -> None:
     """The database should contain a clinics table."""
     inspector = inspect(test_engine)
@@ -16,6 +17,7 @@ def test_clinics_table_exists(test_engine: Engine) -> None:
     assert "clinics" in inspector.get_table_names()
 
 
+# checks that clinics table has required columns works as expected.
 def test_clinics_table_has_required_columns(test_engine: Engine) -> None:
     """The clinics table should contain the expected fields."""
     inspector = inspect(test_engine)
@@ -41,6 +43,7 @@ def test_clinics_table_has_required_columns(test_engine: Engine) -> None:
     assert expected_columns.issubset(columns)
 
 
+# checks that create clinic works as expected.
 def test_create_clinic(test_session: Session) -> None:
     """A clinic can be saved to the test database."""
     clinic = Clinic(
@@ -64,6 +67,7 @@ def test_create_clinic(test_session: Session) -> None:
     assert clinic.updated_at is not None
 
 
+# checks that retrieve clinic works as expected.
 def test_retrieve_clinic(test_session: Session) -> None:
     """A saved clinic can be retrieved by its ID."""
     clinic = Clinic(
@@ -87,6 +91,7 @@ def test_retrieve_clinic(test_session: Session) -> None:
     assert saved_clinic.city == "Toronto"
 
 
+# checks that database rejects non toronto timezone works as expected.
 def test_database_rejects_non_toronto_timezone(
     test_session: Session,
 ) -> None:

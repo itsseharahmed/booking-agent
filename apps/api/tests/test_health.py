@@ -6,13 +6,13 @@ from optometry.main import app
 client = TestClient(app)
 
 
-# test api is running
+# checks that health endpoint returns 200 works as expected.
 def test_health_endpoint_returns_200():
     response = client.get("/health")
     assert response.status_code == 200
 
 
-# predictable response
+# checks that health endpoint returns expected json works as expected.
 def test_health_endpoint_returns_expected_json():
     response = client.get("/health")
     assert response.json() == {

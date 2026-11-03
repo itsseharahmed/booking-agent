@@ -8,7 +8,7 @@ from optometry.api.optometrists import router as optometrists_router
 from optometry.api.schedules import router as schedules_router
 from optometry.api.services import router as services_router
 
-# creates the central FastAPI application
+# creates the api application.
 app = FastAPI(
     title="Optometry Booking Agent",
     version="0.1.0",
@@ -28,6 +28,7 @@ app.include_router(admin_auth_router)
 
 
 @app.get("/")
+# returns the landing-page response for the api.
 def home() -> dict[str, str]:
     return {
         "message": "Optometry Booking Agent API",
@@ -37,6 +38,7 @@ def home() -> dict[str, str]:
 
 
 @app.get("/health")
+# checks whether the service is healthy.
 def health_check() -> dict[str, str]:
     # report whether api process is running
     return {

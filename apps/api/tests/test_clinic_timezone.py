@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from optometry.schemas.clinic import ClinicCreate
 
 
+# checks that reject clinic with different timezone works as expected.
 def test_reject_clinic_with_different_timezone() -> None:
     """Clinics outside the supported timezone must be rejected."""
 

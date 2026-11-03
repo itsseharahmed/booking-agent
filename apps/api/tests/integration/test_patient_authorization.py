@@ -20,7 +20,9 @@ from optometry.db.session import get_db
 TEST_SECRET = "test-only-secret-not-for-production"
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# handles the authentication flow.
 def auth_data(test_session, monkeypatch):
     monkeypatch.setenv("JWT_SECRET_KEY", TEST_SECRET)
 
@@ -88,12 +90,16 @@ def auth_data(test_session, monkeypatch):
     }
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# builds the test client used by the test.
 def client(test_session, auth_data):
+    # creates the api application.
     app = FastAPI()
     app.include_router(appointments_router)
     app.include_router(patients_router)
 
+    # overrides a dependency during the test.
     def override_db():
         yield test_session
 
@@ -103,6 +109,7 @@ def client(test_session, auth_data):
         yield test_client
 
 
+# handles the authentication flow.
 def auth_headers(patient_id, *, now=None):
     token = create_access_token(
         patient_id=patient_id,
@@ -112,6 +119,7 @@ def auth_headers(patient_id, *, now=None):
     return {"Authorization": f"Bearer {token}"}
 
 
+# checks that patient can read own profile works as expected.
 def test_patient_can_read_own_profile(client, auth_data):
     response = client.get(
         "/patients/me",
@@ -124,18 +132,21 @@ def test_patient_can_read_own_profile(client, auth_data):
     assert "password_hash" not in response.json()
 
 
+# checks that profile requires authentication works as expected.
 def test_profile_requires_authentication(client):
     response = client.get("/patients/me")
 
     assert response.status_code == 401
 
 
+# checks that booking list requires authentication works as expected.
 def test_booking_list_requires_authentication(client):
     response = client.get("/appointments")
 
     assert response.status_code == 401
 
 
+# checks that booking creation requires authentication works as expected.
 def test_booking_creation_requires_authentication(client):
     response = client.post(
         "/appointments",
@@ -150,6 +161,7 @@ def test_booking_creation_requires_authentication(client):
     assert response.status_code == 401
 
 
+# checks that patient cannot read another appointment works as expected.
 def test_patient_cannot_read_another_appointment(client, auth_data):
     response = client.get(
         f"/appointments/{auth_data['appointment_id']}",
@@ -159,6 +171,7 @@ def test_patient_cannot_read_another_appointment(client, auth_data):
     assert response.status_code == 404
 
 
+# checks that patient cannot cancel another appointment works as expected.
 def test_patient_cannot_cancel_another_appointment(client, auth_data):
     response = client.post(
         f"/appointments/{auth_data['appointment_id']}/cancel",
@@ -168,6 +181,7 @@ def test_patient_cannot_cancel_another_appointment(client, auth_data):
     assert response.status_code == 404
 
 
+# checks that patient list excludes other appointments works as expected.
 def test_patient_list_excludes_other_appointments(client, auth_data):
     response = client.get(
         "/appointments",
@@ -178,6 +192,7 @@ def test_patient_list_excludes_other_appointments(client, auth_data):
     assert response.json() == []
 
 
+# checks that owner can read appointment works as expected.
 def test_owner_can_read_appointment(client, auth_data):
     response = client.get(
         f"/appointments/{auth_data['appointment_id']}",
@@ -188,6 +203,7 @@ def test_owner_can_read_appointment(client, auth_data):
     assert response.json()["id"] == auth_data["appointment_id"]
 
 
+# checks that invalid token rejected works as expected.
 def test_invalid_token_rejected(client):
     response = client.get(
         "/patients/me",
@@ -197,6 +213,7 @@ def test_invalid_token_rejected(client):
     assert response.status_code == 401
 
 
+# checks that expired token rejected works as expected.
 def test_expired_token_rejected(client, auth_data):
     past = datetime.now(UTC) - timedelta(hours=2)
 
@@ -211,6 +228,7 @@ def test_expired_token_rejected(client, auth_data):
     assert response.status_code == 401
 
 
+# checks that inactive patient token rejected works as expected.
 def test_inactive_patient_token_rejected(client, test_session, auth_data):
     patient = test_session.get(Patient, auth_data["owner_id"])
     assert patient is not None
@@ -226,6 +244,7 @@ def test_inactive_patient_token_rejected(client, test_session, auth_data):
     assert response.status_code == 401
 
 
+# checks that token for nonexistent patient rejected works as expected.
 def test_token_for_nonexistent_patient_rejected(client):
     response = client.get(
         "/patients/me",

@@ -5,16 +5,19 @@ from sqlalchemy.orm import Session
 
 from optometry.db.models.clinic import Clinic
 from optometry.db.models.optometrist import Optometrist
+from optometry.db.models.optometrist_clinic import OptometristClinic
 from optometry.db.session import get_db
 from optometry.main import app
-from optometry.db.models.optometrist_clinic import OptometristClinic
 
+
+# checks that create optometrist works as expected.
 def test_create_optometrist(
     test_session: Session,
     admin_auth_headers: dict[str, str],
 ) -> None:
     """Create an optometrist through the API."""
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -45,12 +48,14 @@ def test_create_optometrist(
         app.dependency_overrides.clear()
 
 
+# checks that reject optometrist with whitespace only name works as expected.
 def test_reject_optometrist_with_whitespace_only_name(
     test_session: Session,
     admin_auth_headers: dict[str, str],
 ) -> None:
     """Reject optometrist names containing only whitespace."""
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -73,12 +78,14 @@ def test_reject_optometrist_with_whitespace_only_name(
         app.dependency_overrides.clear()
 
 
+# checks that list optometrists works as expected.
 def test_list_optometrists(
     test_session: Session,
     admin_auth_headers: dict[str, str],
 ) -> None:
     """Retrieve optometrists through the API."""
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -116,6 +123,7 @@ def test_list_optometrists(
         app.dependency_overrides.clear()
 
 
+# checks that assign optometrist to clinic works as expected.
 def test_assign_optometrist_to_clinic(
     test_session: Session,
     admin_auth_headers: dict[str, str],
@@ -135,6 +143,7 @@ def test_assign_optometrist_to_clinic(
     test_session.add(clinic)
     test_session.flush()
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -169,6 +178,7 @@ def test_assign_optometrist_to_clinic(
         app.dependency_overrides.clear()
 
 
+# checks that reject duplicate clinic assignment works as expected.
 def test_reject_duplicate_clinic_assignment(
     test_session: Session,
     admin_auth_headers: dict[str, str],
@@ -188,6 +198,7 @@ def test_reject_duplicate_clinic_assignment(
     test_session.add(clinic)
     test_session.flush()
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -229,6 +240,7 @@ def test_reject_duplicate_clinic_assignment(
         app.dependency_overrides.clear()
 
 
+# checks that reject assignment to nonexistent optometrist works as expected.
 def test_reject_assignment_to_nonexistent_optometrist(
     test_session: Session,
     admin_auth_headers: dict[str, str],
@@ -248,6 +260,7 @@ def test_reject_assignment_to_nonexistent_optometrist(
     test_session.add(clinic)
     test_session.flush()
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -267,12 +280,14 @@ def test_reject_assignment_to_nonexistent_optometrist(
         app.dependency_overrides.clear()
 
 
+# checks that reject assignment to nonexistent clinic works as expected.
 def test_reject_assignment_to_nonexistent_clinic(
     test_session: Session,
     admin_auth_headers: dict[str, str],
 ) -> None:
     """Return 404 when the clinic does not exist."""
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -304,6 +319,7 @@ def test_reject_assignment_to_nonexistent_clinic(
         app.dependency_overrides.clear()
 
 
+# checks that cannot assign optometrist to inactive clinic works as expected.
 def test_cannot_assign_optometrist_to_inactive_clinic(
     test_session: Session,
     admin_auth_headers: dict[str, str],
@@ -328,6 +344,7 @@ def test_cannot_assign_optometrist_to_inactive_clinic(
     test_session.add_all([clinic, optometrist])
     test_session.flush()
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 

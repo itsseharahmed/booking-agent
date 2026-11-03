@@ -3,11 +3,13 @@
 from sqlalchemy import Engine, inspect
 
 
+# checks that schema check table exists works as expected.
 def test_schema_check_table_exists(test_engine: Engine) -> None:
     """Verify that the initial migration creates the schema_check table."""
     assert inspect(test_engine).has_table("schema_check")
 
 
+# checks that schema check has expected columns works as expected.
 def test_schema_check_has_expected_columns(test_engine: Engine) -> None:
     """Verify the expected schema after migration."""
     columns = {

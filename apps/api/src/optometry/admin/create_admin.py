@@ -1,4 +1,4 @@
-"""Create administrator accounts securely."""
+# create administrator accounts securely.
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -8,14 +8,16 @@ from optometry.core.security import hash_password
 from optometry.db.models.admin import Admin
 
 
+# creates a new admin.
 def create_admin(
     *,
     db: Session,
     email: str,
     password: str,
 ) -> Admin:
-    normalized_email = email.strip().lower()
+    normalized_email = email.strip().lower()  # normalize to prevent duplicates
 
+    # check for invalid addresses
     if (
         not normalized_email
         or normalized_email.count("@") != 1
@@ -23,16 +25,20 @@ def create_admin(
     ):
         raise ValueError("Invalid email address")
 
+    # check length
     if not 12 <= len(password) <= 128:
         raise ValueError("Password must be at least 12 and at most 128 characters")
 
+    # look for an existing email
     existing = db.scalar(
         select(Admin.id).where(func.lower(Admin.email) == normalized_email)
     )
 
+    # if email already exists
     if existing is not None:
         raise ValueError("Administrator with this email already exists")
 
+    # hash password and store
     admin = Admin(
         email=normalized_email,
         password_hash=hash_password(password),

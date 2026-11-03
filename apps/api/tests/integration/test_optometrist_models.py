@@ -8,6 +8,7 @@ from optometry.db.models.optometrist import Optometrist
 from optometry.db.models.optometrist_clinic import OptometristClinic
 
 
+# checks that create optometrist works as expected.
 def test_create_optometrist(test_session: Session) -> None:
     """An optometrist can be saved and retrieved."""
 
@@ -32,6 +33,7 @@ def test_create_optometrist(test_session: Session) -> None:
     assert saved.created_at is not None
 
 
+# checks that assign optometrist to multiple clinics works as expected.
 def test_assign_optometrist_to_multiple_clinics(
     test_session: Session,
 ) -> None:

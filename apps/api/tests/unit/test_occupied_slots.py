@@ -13,6 +13,7 @@ from optometry.availability.engine import (
 TORONTO = ZoneInfo("America/Toronto")
 
 
+# handles the slot workflow.
 def slot(start_hour: int, start_minute: int, end_hour: int, end_minute: int):
     return AvailabilitySlot(
         start=datetime(2026, 11, 2, start_hour, start_minute, tzinfo=TORONTO),
@@ -20,6 +21,7 @@ def slot(start_hour: int, start_minute: int, end_hour: int, end_minute: int):
     )
 
 
+# checks that exact occupied slot is excluded works as expected.
 def test_exact_occupied_slot_is_excluded():
     available = [
         slot(9, 0, 9, 20),
@@ -35,6 +37,7 @@ def test_exact_occupied_slot_is_excluded():
     assert result == [available[0], available[2]]
 
 
+# checks that partial overlap is excluded works as expected.
 def test_partial_overlap_is_excluded():
     available = [
         slot(9, 0, 9, 20),
@@ -49,6 +52,7 @@ def test_partial_overlap_is_excluded():
     assert result == []
 
 
+# checks that adjacent appointments are allowed works as expected.
 def test_adjacent_appointments_are_allowed():
     available = [
         slot(9, 0, 9, 20),
@@ -63,6 +67,7 @@ def test_adjacent_appointments_are_allowed():
     assert result == [available[0]]
 
 
+# checks that long occupied interval blocks multiple slots works as expected.
 def test_long_occupied_interval_blocks_multiple_slots():
     available = [
         slot(9, 0, 9, 20),
@@ -78,12 +83,14 @@ def test_long_occupied_interval_blocks_multiple_slots():
     assert result == []
 
 
+# checks that empty occupied list preserves slots works as expected.
 def test_empty_occupied_list_preserves_slots():
     available = [slot(9, 0, 9, 20)]
 
     assert exclude_occupied_slots(available, []) == available
 
 
+# checks that invalid occupied interval rejected works as expected.
 def test_invalid_occupied_interval_rejected():
     with pytest.raises(ValueError):
         exclude_occupied_slots(
@@ -92,6 +99,7 @@ def test_invalid_occupied_interval_rejected():
         )
 
 
+# checks that naive occupied interval rejected works as expected.
 def test_naive_occupied_interval_rejected():
     occupied = AvailabilitySlot(
         start=datetime(2026, 11, 2, 9, 0),

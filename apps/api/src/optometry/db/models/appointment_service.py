@@ -1,4 +1,5 @@
 """Global appointment service catalog."""
+# this file contains the src / optometry / db / models / appointment_service.py logic.
 
 from datetime import datetime
 
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from optometry.db.base import Base
 
 
+# handles the AppointmentService workflow.
 class AppointmentService(Base):
     """An appointment type offered at every clinic."""
 

@@ -10,6 +10,7 @@ from optometry.availability.engine import generate_slots
 TORONTO = ZoneInfo("America/Toronto")
 
 
+# checks that generates twenty minute slots works as expected.
 def test_generates_twenty_minute_slots() -> None:
     slots = generate_slots(
         appointment_date=date(2026, 11, 2),
@@ -26,6 +27,7 @@ def test_generates_twenty_minute_slots() -> None:
     assert slots[-1].end.time() == time(10, 0)
 
 
+# checks that excludes partial final slot works as expected.
 def test_excludes_partial_final_slot() -> None:
     slots = generate_slots(
         appointment_date=date(2026, 11, 2),
@@ -36,6 +38,7 @@ def test_excludes_partial_final_slot() -> None:
     assert len(slots) == 2
 
 
+# checks that slots anchor to shift start works as expected.
 def test_slots_anchor_to_shift_start() -> None:
     slots = generate_slots(
         appointment_date=date(2026, 11, 2),
@@ -50,6 +53,7 @@ def test_slots_anchor_to_shift_start() -> None:
     ]
 
 
+# checks that short shift returns no slots works as expected.
 def test_short_shift_returns_no_slots() -> None:
     slots = generate_slots(
         appointment_date=date(2026, 11, 2),
@@ -60,6 +64,7 @@ def test_short_shift_returns_no_slots() -> None:
     assert slots == []
 
 
+# checks that invalid shift rejected works as expected.
 def test_invalid_shift_rejected() -> None:
     with pytest.raises(ValueError):
         generate_slots(
@@ -69,6 +74,7 @@ def test_invalid_shift_rejected() -> None:
         )
 
 
+# checks that excludes past and current slots works as expected.
 def test_excludes_past_and_current_slots() -> None:
     slots = generate_slots(
         appointment_date=date(2026, 11, 2),
@@ -81,6 +87,7 @@ def test_excludes_past_and_current_slots() -> None:
     assert slots[0].start.time() == time(9, 40)
 
 
+# checks that rejects naive now works as expected.
 def test_rejects_naive_now() -> None:
     with pytest.raises(ValueError):
         generate_slots(
@@ -91,6 +98,7 @@ def test_rejects_naive_now() -> None:
         )
 
 
+# checks that returns timezone aware slots works as expected.
 def test_returns_timezone_aware_slots() -> None:
     slots = generate_slots(
         appointment_date=date(2026, 7, 6),
@@ -102,6 +110,7 @@ def test_returns_timezone_aware_slots() -> None:
     assert slots[0].start.utcoffset().total_seconds() == -14400
 
 
+# checks that spring dst gap excluded works as expected.
 def test_spring_dst_gap_excluded() -> None:
     slots = generate_slots(
         appointment_date=date(2026, 3, 8),
@@ -113,6 +122,7 @@ def test_spring_dst_gap_excluded() -> None:
     assert all(slot.end.hour != 2 for slot in slots)
 
 
+# checks that fall dst ambiguity excluded works as expected.
 def test_fall_dst_ambiguity_excluded() -> None:
     slots = generate_slots(
         appointment_date=date(2026, 11, 1),
@@ -124,6 +134,7 @@ def test_fall_dst_ambiguity_excluded() -> None:
     assert all(slot.end.hour != 1 for slot in slots)
 
 
+# checks that utc now comparison works as expected.
 def test_utc_now_comparison() -> None:
     slots = generate_slots(
         appointment_date=date(2026, 11, 2),

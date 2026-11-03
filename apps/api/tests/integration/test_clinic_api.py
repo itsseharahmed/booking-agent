@@ -11,11 +11,14 @@ from optometry.db.session import get_db
 from optometry.main import app
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# builds the test client used by the test.
 def client(
     test_session: Session,
     admin_auth_headers: dict[str, str],
 ) -> Iterator[TestClient]:
+    # overrides a dependency during the test.
     def override_db() -> Iterator[Session]:
         yield test_session
 
@@ -28,6 +31,7 @@ def client(
     app.dependency_overrides.clear()
 
 
+# checks that create clinic works as expected.
 def test_create_clinic(client: TestClient) -> None:
     """POST /clinics should create a clinic."""
     response = client.post(
@@ -51,6 +55,7 @@ def test_create_clinic(client: TestClient) -> None:
     assert data["is_active"] is True
 
 
+# checks that list clinics works as expected.
 def test_list_clinics(client: TestClient) -> None:
     """GET /clinics should return a list."""
     response = client.get("/clinics")
@@ -59,6 +64,7 @@ def test_list_clinics(client: TestClient) -> None:
     assert isinstance(response.json(), list)
 
 
+# checks that get unknown clinic works as expected.
 def test_get_unknown_clinic(client: TestClient) -> None:
     """An existing route should return 404 for an unknown clinic."""
     response = client.get("/clinics/999999")
@@ -67,6 +73,7 @@ def test_get_unknown_clinic(client: TestClient) -> None:
     assert response.json() == {"detail": "Clinic not found"}
 
 
+# checks that get existing clinic works as expected.
 def test_get_existing_clinic(client: TestClient) -> None:
     """GET /clinics/{id} should return an existing clinic."""
 
@@ -80,14 +87,14 @@ def test_get_existing_clinic(client: TestClient) -> None:
         "timezone": "America/Toronto",
     }
 
-    # Create a clinic using the API.
+    # create a clinic using the API.
     create_response = client.post("/clinics", json=clinic_data)
 
     assert create_response.status_code == 201
 
     clinic_id = create_response.json()["id"]
 
-    # Retrieve the clinic using its generated ID.
+    # retrieve the clinic using its generated ID.
     response = client.get(f"/clinics/{clinic_id}")
 
     assert response.status_code == 200
@@ -96,6 +103,7 @@ def test_get_existing_clinic(client: TestClient) -> None:
     assert response.json()["city"] == "Toronto"
 
 
+# checks that create clinic missing name works as expected.
 def test_create_clinic_missing_name(client: TestClient) -> None:
     """Creating a clinic without a name should fail validation."""
 
@@ -112,6 +120,7 @@ def test_create_clinic_missing_name(client: TestClient) -> None:
     assert response.status_code == 422
 
 
+# checks that create clinic invalid timezone works as expected.
 def test_create_clinic_invalid_timezone(client: TestClient) -> None:
     """Creating a clinic with an invalid timezone should fail."""
 
@@ -130,6 +139,7 @@ def test_create_clinic_invalid_timezone(client: TestClient) -> None:
     assert response.status_code == 422
 
 
+# checks that list multiple clinics works as expected.
 def test_list_multiple_clinics(client: TestClient) -> None:
     """GET /clinics should return multiple clinics."""
 
@@ -162,6 +172,7 @@ def test_list_multiple_clinics(client: TestClient) -> None:
     assert set(clinic_names).issubset(returned_names)
 
 
+# checks that list only active clinics works as expected.
 def test_list_only_active_clinics(
     client: TestClient,
     test_session: Session,
@@ -203,6 +214,7 @@ def test_list_only_active_clinics(
     assert "Inactive Vision Clinic" not in returned_names
 
 
+# checks that create clinic whitespace only name works as expected.
 def test_create_clinic_whitespace_only_name(client: TestClient) -> None:
     """Reject clinic names containing only whitespace."""
 

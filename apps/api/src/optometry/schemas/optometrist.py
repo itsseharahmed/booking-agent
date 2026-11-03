@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
+# handles the OptometristCreate workflow.
 class OptometristCreate(BaseModel):
     """Validate data required to create an optometrist."""
 
@@ -14,6 +15,7 @@ class OptometristCreate(BaseModel):
 
     @field_validator("first_name", "last_name")
     @classmethod
+    # validates the required name input.
     def validate_required_name(cls, value: str) -> str:
         """Trim whitespace and reject empty names."""
         cleaned = value.strip()
@@ -24,6 +26,7 @@ class OptometristCreate(BaseModel):
         return cleaned
 
 
+# handles the OptometristRead workflow.
 class OptometristRead(BaseModel):
     """Define the optometrist data returned by the API."""
 
@@ -38,6 +41,7 @@ class OptometristRead(BaseModel):
     updated_at: datetime
 
 
+# handles the OptometristUpdate workflow.
 class OptometristUpdate(BaseModel):
     first_name: str | None = Field(default=None, min_length=1, max_length=100)
     last_name: str | None = Field(default=None, min_length=1, max_length=100)
@@ -45,6 +49,7 @@ class OptometristUpdate(BaseModel):
     is_active: bool | None = None
 
     @model_validator(mode="after")
+    # validates the update input.
     def validate_update(self) -> "OptometristUpdate":
         if not self.model_fields_set:
             raise ValueError("At least one field must be provided")

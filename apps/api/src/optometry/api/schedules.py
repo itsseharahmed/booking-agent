@@ -1,4 +1,4 @@
-"""API endpoints for weekly working schedules."""
+# API endpoints for weekly working schedules.
 
 from typing import Annotated
 
@@ -17,8 +17,10 @@ from optometry.schemas.working_schedule import (
     WorkingScheduleUpdate,
 )
 
+# database session dependency used by this module.
 DbSession = Annotated[Session, Depends(get_db)]
 
+# router for this api module.
 router = APIRouter(prefix="/schedules", tags=["Schedules"])
 
 
@@ -28,6 +30,7 @@ router = APIRouter(prefix="/schedules", tags=["Schedules"])
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(get_current_admin)],
 )
+# creates a new schedule.
 def create_schedule(
     payload: WorkingScheduleCreate,
     db: DbSession,
@@ -64,6 +67,7 @@ def create_schedule(
 
 
 @router.get("", response_model=list[WorkingScheduleRead])
+# lists all schedules records.
 def list_schedules(
     db: DbSession,
     optometrist_id: int | None = None,
@@ -97,6 +101,7 @@ def list_schedules(
     response_model=WorkingScheduleRead,
     dependencies=[Depends(get_current_admin)],
 )
+# updates the schedule record.
 def update_schedule(
     schedule_id: int,
     payload: WorkingScheduleUpdate,
@@ -157,6 +162,7 @@ def update_schedule(
     status_code=204,
     dependencies=[Depends(get_current_admin)],
 )
+# deletes the schedule record.
 def delete_schedule(
     schedule_id: int,
     db: DbSession,

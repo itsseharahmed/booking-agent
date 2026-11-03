@@ -11,13 +11,16 @@ from optometry.db.session import get_db
 from optometry.main import app
 
 
+# creates the shared test fixture.
 @pytest.fixture
+# builds the test client used by the test.
 def client(
     test_session: Session,
     admin_auth_headers: dict[str, str],
 ):
     """Provide an authenticated admin client using the test database."""
 
+    # overrides a dependency during the test.
     def override_get_db():
         yield test_session
 
@@ -30,6 +33,7 @@ def client(
         app.dependency_overrides.clear()
 
 
+# checks that create service works as expected.
 def test_create_service(client: TestClient) -> None:
     response = client.post(
         "/services",
@@ -44,6 +48,7 @@ def test_create_service(client: TestClient) -> None:
     assert response.json()["is_active"] is True
 
 
+# checks that list and retrieve services works as expected.
 def test_list_and_retrieve_services(client: TestClient) -> None:
     created = client.post(
         "/services",
@@ -60,6 +65,7 @@ def test_list_and_retrieve_services(client: TestClient) -> None:
     assert detail.json()["id"] == service_id
 
 
+# checks that update and deactivate service works as expected.
 def test_update_and_deactivate_service(client: TestClient) -> None:
     created = client.post(
         "/services",
@@ -84,6 +90,7 @@ def test_update_and_deactivate_service(client: TestClient) -> None:
     assert active_listing.json() == []
 
 
+# checks that duplicate service rejected works as expected.
 def test_duplicate_service_rejected(client: TestClient) -> None:
     payload = {"name": "Duplicate Eye Exam"}
 
@@ -94,6 +101,7 @@ def test_duplicate_service_rejected(client: TestClient) -> None:
 
 
 @pytest.mark.parametrize("name", ["", "   "])
+# checks that invalid service name works as expected.
 def test_invalid_service_name(
     client: TestClient,
     name: str,
@@ -102,6 +110,7 @@ def test_invalid_service_name(
     assert response.status_code == 422
 
 
+# checks that missing service returns 404 works as expected.
 def test_missing_service_returns_404(client: TestClient) -> None:
     assert client.get("/services/999999").status_code == 404
     assert (
@@ -113,6 +122,7 @@ def test_missing_service_returns_404(client: TestClient) -> None:
     )
 
 
+# checks that update clinic appointment price works as expected.
 def test_update_clinic_appointment_price(
     client: TestClient,
     test_session: Session,
@@ -139,6 +149,7 @@ def test_update_clinic_appointment_price(
 
 
 @pytest.mark.parametrize("price", ["-1.00", "12.345"])
+# checks that invalid clinic price works as expected.
 def test_invalid_clinic_price(
     client: TestClient,
     test_session: Session,
@@ -164,6 +175,7 @@ def test_invalid_clinic_price(
     assert response.status_code == 422
 
 
+# checks that missing clinic price update works as expected.
 def test_missing_clinic_price_update(client: TestClient) -> None:
     response = client.patch(
         "/clinics/999999/appointment-price",
@@ -172,6 +184,7 @@ def test_missing_clinic_price_update(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+# checks that service names are normalized works as expected.
 def test_service_names_are_normalized(client: TestClient) -> None:
     response = client.post(
         "/services",
@@ -182,6 +195,7 @@ def test_service_names_are_normalized(client: TestClient) -> None:
     assert response.json()["name"] == "Comprehensive Eye Exam"
 
 
+# checks that service can be reactivated works as expected.
 def test_service_can_be_reactivated(client: TestClient) -> None:
     created = client.post(
         "/services",
