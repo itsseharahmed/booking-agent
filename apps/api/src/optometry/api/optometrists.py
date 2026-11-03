@@ -88,6 +88,12 @@ def assign_optometrist_to_clinic(
             detail="Clinic not found",
         )
 
+    if not clinic.is_active:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot assign optometrist to an inactive clinic",
+        )
+    
     existing_assignment = db.get(
         OptometristClinic,
         (optometrist_id, payload.clinic_id),

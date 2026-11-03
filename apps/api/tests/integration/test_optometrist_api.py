@@ -4,9 +4,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from optometry.db.models.clinic import Clinic
+from optometry.db.models.optometrist import Optometrist
 from optometry.db.session import get_db
 from optometry.main import app
-
+from optometry.db.models.optometrist_clinic import OptometristClinic
 
 def test_create_optometrist(
     test_session: Session,
@@ -301,3 +302,53 @@ def test_reject_assignment_to_nonexistent_clinic(
 
     finally:
         app.dependency_overrides.clear()
+
+
+def test_cannot_assign_optometrist_to_inactive_clinic(
+    test_session: Session,
+    admin_auth_headers: dict[str, str],
+) -> None:
+    """Inactive clinics must reject new optometrist assignments."""
+
+    clinic = Clinic(
+        name="Inactive Assignment Test Clinic",
+        address_line1="123 Test Street",
+        city="Toronto",
+        province="Ontario",
+        postal_code="M5V 2T6",
+        country="CA",
+        timezone="America/Toronto",
+        is_active=False,
+    )
+    optometrist = Optometrist(
+        first_name="Inactive Assignment",
+        last_name="Test Optometrist",
+    )
+
+    test_session.add_all([clinic, optometrist])
+    test_session.flush()
+
+    def override_get_db():
+        yield test_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        with TestClient(app, headers=admin_auth_headers) as client:
+            response = client.post(
+                f"/optometrists/{optometrist.id}/clinics",
+                json={"clinic_id": clinic.id},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Cannot assign optometrist to an inactive clinic"
+    )
+
+    assignment = test_session.get(
+        OptometristClinic,
+        (optometrist.id, clinic.id),
+    )
+    assert assignment is None
