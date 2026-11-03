@@ -3,11 +3,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from redis import Redis
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from optometry.auth.admin_dependencies import get_current_admin
+from optometry.cache.admin_invalidation import invalidate_admin_availability
+from optometry.cache.redis_client import create_redis_client
 from optometry.db.models.clinic import Clinic
 from optometry.db.session import get_db
 from optometry.schemas.clinic import (
@@ -23,6 +26,9 @@ router = APIRouter(prefix="/clinics", tags=["Clinics"])
 # fastAPI injects a database session into each endpoint.
 DatabaseSession = Annotated[Session, Depends(get_db)]
 
+# provides redis for administrative cache invalidation
+RedisClient = Annotated[Redis, Depends(create_redis_client)]
+
 
 @router.post(
     "",
@@ -31,12 +37,19 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
     dependencies=[Depends(get_current_admin)],
 )
 # creates a new clinic.
-def create_clinic(clinic_data: ClinicCreate, db: DatabaseSession) -> Clinic:
+def create_clinic(
+    clinic_data: ClinicCreate, db: DatabaseSession, redis_client: RedisClient
+) -> Clinic:
     """Create a clinic and persist it to PostgreSQL."""
     clinic = Clinic(**clinic_data.model_dump())
 
     db.add(clinic)
     db.commit()
+    # invalidate availability after the clinic change is committed
+    invalidate_admin_availability(
+        redis_client,
+        clinic_id=clinic.id,
+    )
     db.refresh(clinic)
 
     return clinic
@@ -87,6 +100,7 @@ def update_clinic_appointment_price(
     clinic_id: int,
     payload: ClinicAppointmentPriceUpdate,
     db: Annotated[Session, Depends(get_db)],
+    redis_client: RedisClient,
 ) -> Clinic:
     """Update the standard price for every appointment at a clinic."""
 
@@ -100,6 +114,11 @@ def update_clinic_appointment_price(
 
     clinic.appointment_price = payload.appointment_price
     db.commit()
+    # invalidate availability after the clinic change is committed
+    invalidate_admin_availability(
+        redis_client,
+        clinic_id=clinic_id,
+    )
     db.refresh(clinic)
 
     return clinic
@@ -115,6 +134,7 @@ def update_clinic(
     clinic_id: int,
     payload: ClinicUpdate,
     db: DatabaseSession,
+    redis_client: RedisClient,
 ) -> Clinic:
     clinic = db.get(Clinic, clinic_id)
 
@@ -125,6 +145,11 @@ def update_clinic(
         setattr(clinic, field, value)
 
     db.commit()
+    # invalidate availability after the clinic change is committed
+    invalidate_admin_availability(
+        redis_client,
+        clinic_id=clinic_id,
+    )
     db.refresh(clinic)
     return clinic
 
@@ -136,8 +161,7 @@ def update_clinic(
 )
 # deletes the clinic record.
 def delete_clinic(
-    clinic_id: int,
-    db: DatabaseSession,
+    clinic_id: int, db: DatabaseSession, redis_client: RedisClient
 ) -> Response:
     clinic = db.get(Clinic, clinic_id)
 
@@ -155,4 +179,9 @@ def delete_clinic(
         ) from exc
 
     db.commit()
+    # invalidate availability after the clinic change is committed
+    invalidate_admin_availability(
+        redis_client,
+        clinic_id=clinic_id,
+    )
     return Response(status_code=204)

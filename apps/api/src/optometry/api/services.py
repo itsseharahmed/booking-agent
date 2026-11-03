@@ -3,11 +3,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from redis import Redis
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from optometry.auth.admin_dependencies import get_current_admin
+from optometry.cache.admin_invalidation import invalidate_admin_availability
+from optometry.cache.redis_client import create_redis_client
 from optometry.db.models.appointment_service import AppointmentService
 from optometry.db.session import get_db
 from optometry.schemas.appointment_service import (
@@ -22,6 +25,9 @@ router = APIRouter(prefix="/services", tags=["Services"])
 # database session dependency used by this module.
 DbSession = Annotated[Session, Depends(get_db)]
 
+# provides redis for administrative cache invalidation
+RedisClient = Annotated[Redis, Depends(create_redis_client)]
+
 
 @router.post(
     "",
@@ -31,14 +37,14 @@ DbSession = Annotated[Session, Depends(get_db)]
 )
 # creates a new service.
 def create_service(
-    payload: AppointmentServiceCreate,
-    db: DbSession,
+    payload: AppointmentServiceCreate, db: DbSession, redis_client: RedisClient
 ) -> AppointmentService:
     service = AppointmentService(**payload.model_dump())
     db.add(service)
 
     try:
         db.commit()
+
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
@@ -46,6 +52,11 @@ def create_service(
             detail="Service name already exists",
         ) from exc
 
+    # invalidate availability for the affected service
+    invalidate_admin_availability(
+        redis_client,
+        service_id=service.id,
+    )
     db.refresh(service)
     return service
 
@@ -89,6 +100,7 @@ def update_service(
     service_id: int,
     payload: AppointmentServiceUpdate,
     db: DbSession,
+    redis_client: RedisClient,
 ) -> AppointmentService:
     service = db.get(AppointmentService, service_id)
 
@@ -100,6 +112,7 @@ def update_service(
 
     try:
         db.commit()
+
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
@@ -107,6 +120,11 @@ def update_service(
             detail="Service name already exists",
         ) from exc
 
+    # invalidate availability for the affected service
+    invalidate_admin_availability(
+        redis_client,
+        service_id=service.id,
+    )
     db.refresh(service)
     return service
 
@@ -118,8 +136,7 @@ def update_service(
 )
 # deletes the service record.
 def delete_service(
-    service_id: int,
-    db: DbSession,
+    service_id: int, db: DbSession, redis_client: RedisClient
 ) -> Response:
     service = db.get(AppointmentService, service_id)
 
@@ -140,5 +157,9 @@ def delete_service(
         ) from exc
 
     db.commit()
-
+    # invalidate availability for the affected service
+    invalidate_admin_availability(
+        redis_client,
+        service_id=service.id,
+    )
     return Response(status_code=204)

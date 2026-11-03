@@ -7,7 +7,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from optometry.api.appointments import get_redis_client as get_appointments_redis
 from optometry.api.appointments import router as appointments_router
+from optometry.api.availability import get_redis_client as get_availability_redis
 from optometry.api.availability import router as availability_router
 from optometry.core.security import create_access_token, hash_password
 from optometry.db.models.appointment import Appointment
@@ -23,7 +25,7 @@ from optometry.db.session import get_db
 # creates the shared test fixture.
 @pytest.fixture
 # builds the test client used by the test.
-def client(test_session, monkeypatch):
+def client(test_session, test_redis, monkeypatch):
     monkeypatch.setenv(
         "JWT_SECRET_KEY",
         "test-only-secret-not-for-production",
@@ -53,6 +55,10 @@ def client(test_session, monkeypatch):
         yield test_session
 
     app.dependency_overrides[get_db] = override_db
+
+    # use the isolated redis database for booking tests
+    app.dependency_overrides[get_appointments_redis] = lambda: test_redis
+    app.dependency_overrides[get_availability_redis] = lambda: test_redis
 
     with TestClient(app) as test_client:
         test_client.headers.update({"Authorization": f"Bearer {token}"})
@@ -484,3 +490,321 @@ def test_booking_response_uses_toronto_timezone(
 
     assert result["start_at"] == slot["start"]
     assert result["end_at"] == slot["end"]
+
+
+# checks that repeated availability requests use redis
+def test_availability_uses_real_redis_cache(
+    client,
+    test_redis,
+    booking_data,
+    monkeypatch,
+):
+    import optometry.api.availability as availability_api
+
+    calls = 0
+    original = availability_api.get_availability
+
+    def tracked_availability(**kwargs):
+        nonlocal calls
+        calls += 1
+        return original(**kwargs)
+
+    monkeypatch.setattr(
+        availability_api,
+        "get_availability",
+        tracked_availability,
+    )
+
+    first = client.get(
+        "/availability",
+        params=availability_params(booking_data),
+    )
+    second = client.get(
+        "/availability",
+        params=availability_params(booking_data),
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json() == second.json()
+    assert calls == 1
+    assert test_redis.dbsize() > 0
+
+
+# checks that booking invalidates cached availability in redis
+def test_booking_invalidates_real_redis_cache(
+    client,
+    test_redis,
+    booking_data,
+):
+    params = availability_params(booking_data)
+
+    # populate the cache before booking
+    before = client.get("/availability", params=params)
+    assert before.status_code == 200
+
+    slot = before.json()["slots"][0]
+
+    old_keys = set(test_redis.scan_iter(match="availability:v3:*"))
+    assert len(old_keys) == 1
+
+    # book a slot using the real appointment endpoint
+    created = client.post(
+        "/appointments",
+        json=booking_payload(booking_data, slot),
+    )
+    assert created.status_code == 201
+
+    # the booking must increment the doctor and date version
+    version_key = (
+        f"availability:version:doctor:{booking_data['optometrist_id']}:"
+        f"date:{booking_data['appointment_date']}"
+    )
+    assert test_redis.get(version_key) == "1"
+
+    # the next request must use a new cache key
+    after = client.get("/availability", params=params)
+    assert after.status_code == 200
+
+    starts = [item["start"] for item in after.json()["slots"]]
+    assert slot["start"] not in starts
+
+    new_keys = set(test_redis.scan_iter(match="availability:v3:*"))
+    assert len(new_keys - old_keys) == 1
+
+
+# checks that cancellation invalidates cached availability in redis
+def test_cancellation_invalidates_real_redis_cache(
+    client,
+    test_redis,
+    booking_data,
+):
+    params = availability_params(booking_data)
+
+    # load an available slot
+    initial = client.get("/availability", params=params)
+    assert initial.status_code == 200
+    slot = initial.json()["slots"][0]
+
+    # book the slot
+    created = client.post(
+        "/appointments",
+        json=booking_payload(booking_data, slot),
+    )
+    assert created.status_code == 201
+    appointment_id = created.json()["id"]
+
+    # cache availability while the slot is booked
+    booked = client.get("/availability", params=params)
+    assert booked.status_code == 200
+    assert slot["start"] not in [item["start"] for item in booked.json()["slots"]]
+
+    booked_keys = set(test_redis.scan_iter(match="availability:v3:*"))
+
+    version_key = (
+        f"availability:version:doctor:{booking_data['optometrist_id']}:"
+        f"date:{booking_data['appointment_date']}"
+    )
+    assert test_redis.get(version_key) == "1"
+
+    # cancel the appointment
+    cancelled = client.post(f"/appointments/{appointment_id}/cancel")
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+
+    # cancellation must advance the cache version
+    assert test_redis.get(version_key) == "2"
+
+    # the cancelled slot must become available again
+    restored = client.get("/availability", params=params)
+    assert restored.status_code == 200
+    assert slot["start"] in [item["start"] for item in restored.json()["slots"]]
+
+    # a new versioned cache entry must be created
+    restored_keys = set(test_redis.scan_iter(match="availability:v3:*"))
+    assert len(restored_keys - booked_keys) == 1
+
+
+# checks that rejected cancellation does not invalidate redis
+def test_rejected_cancellation_preserves_cache_version(
+    client,
+    test_redis,
+    booking_data,
+):
+    params = availability_params(booking_data)
+
+    initial = client.get("/availability", params=params)
+    assert initial.status_code == 200
+    slot = initial.json()["slots"][0]
+
+    created = client.post(
+        "/appointments",
+        json=booking_payload(booking_data, slot),
+    )
+    assert created.status_code == 201
+
+    appointment_id = created.json()["id"]
+
+    # cancel the appointment successfully
+    first = client.post(f"/appointments/{appointment_id}/cancel")
+    assert first.status_code == 200
+
+    version_key = (
+        f"availability:version:doctor:{booking_data['optometrist_id']}:"
+        f"date:{booking_data['appointment_date']}"
+    )
+
+    version_before = test_redis.get(version_key)
+    assert version_before == "2"
+
+    # the second cancellation must fail without invalidation
+    second = client.post(f"/appointments/{appointment_id}/cancel")
+    assert second.status_code == 409
+
+    version_after = test_redis.get(version_key)
+
+    assert version_after == version_before
+
+
+# checks that redis failure after commit does not undo a booking
+def test_booking_survives_redis_invalidation_failure(
+    client,
+    test_session,
+    booking_data,
+    monkeypatch,
+):
+    from redis.exceptions import ConnectionError
+
+    import optometry.api.appointments as appointments_api
+
+    response = client.get(
+        "/availability",
+        params=availability_params(booking_data),
+    )
+    assert response.status_code == 200
+    slot = response.json()["slots"][0]
+
+    original = appointments_api.invalidate_availability
+
+    # simulate a redis connection error through the actual client
+    def failed_invalidation(*, client, optometrist_id, appointment_date):
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                client,
+                "incr",
+                lambda key: (_ for _ in ()).throw(ConnectionError("Redis unavailable")),
+            )
+            return original(
+                client=client,
+                optometrist_id=optometrist_id,
+                appointment_date=appointment_date,
+            )
+
+    monkeypatch.setattr(
+        appointments_api,
+        "invalidate_availability",
+        failed_invalidation,
+    )
+
+    created = client.post(
+        "/appointments",
+        json=booking_payload(booking_data, slot),
+    )
+
+    assert created.status_code == 201
+
+    appointment = test_session.get(
+        Appointment,
+        created.json()["id"],
+    )
+
+    assert appointment is not None
+    assert appointment.status == "booked"
+
+
+# checks stale availability recovers after cache expiration
+def test_availability_recovers_after_failed_invalidation(
+    client,
+    test_redis,
+    booking_data,
+    monkeypatch,
+):
+    from redis.exceptions import ConnectionError
+
+    params = availability_params(booking_data)
+
+    # populate the real redis cache
+    initial = client.get("/availability", params=params)
+    assert initial.status_code == 200
+    slot = initial.json()["slots"][0]
+
+    keys = list(test_redis.scan_iter(match="availability:v3:*"))
+    assert len(keys) == 1
+    cached_key = keys[0]
+
+    # simulate redis failure only during booking invalidation
+    def failed_increment(key):
+        raise ConnectionError("Redis unavailable")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(test_redis, "incr", failed_increment)
+
+        created = client.post(
+            "/appointments",
+            json=booking_payload(booking_data, slot),
+        )
+
+    assert created.status_code == 201
+
+    # the stale entry remains because invalidation failed
+    assert test_redis.exists(cached_key) == 1
+
+    stale = client.get("/availability", params=params)
+    assert stale.status_code == 200
+    assert slot["start"] in [item["start"] for item in stale.json()["slots"]]
+
+    # simulate expiration without waiting 30 seconds
+    test_redis.delete(cached_key)
+
+    recovered = client.get("/availability", params=params)
+    assert recovered.status_code == 200
+    assert slot["start"] not in [item["start"] for item in recovered.json()["slots"]]
+
+
+# checks that invalidation during calculation prevents stale caching
+def test_invalidation_during_availability_calculation(
+    client,
+    test_redis,
+    booking_data,
+    monkeypatch,
+):
+    import optometry.api.availability as availability_api
+
+    params = availability_params(booking_data)
+    original = availability_api.get_availability
+
+    version_key = (
+        f"availability:version:doctor:{booking_data['optometrist_id']}:"
+        f"date:{booking_data['appointment_date']}"
+    )
+
+    # invalidate while the availability service runs
+    def invalidate_during_calculation(**kwargs):
+        result = original(**kwargs)
+        test_redis.incr(version_key)
+        return result
+
+    monkeypatch.setattr(
+        availability_api,
+        "get_availability",
+        invalidate_during_calculation,
+    )
+
+    response = client.get("/availability", params=params)
+
+    assert response.status_code == 200
+    assert test_redis.get(version_key) == "1"
+
+    # the outdated cache version must not be stored
+    keys = list(test_redis.scan_iter(match="availability:v3:*"))
+    assert keys == []

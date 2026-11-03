@@ -3,11 +3,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from redis import Redis
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from optometry.auth.admin_dependencies import get_current_admin
+from optometry.cache.admin_invalidation import invalidate_admin_availability
+from optometry.cache.redis_client import create_redis_client
 from optometry.db.models.clinic import Clinic
 from optometry.db.models.optometrist import Optometrist
 from optometry.db.models.optometrist_clinic import OptometristClinic
@@ -28,6 +31,9 @@ DbSession = Annotated[Session, Depends(get_db)]
 # router for this api module.
 router = APIRouter(prefix="/optometrists", tags=["Optometrists"])
 
+# provides redis for administrative cache invalidation
+RedisClient = Annotated[Redis, Depends(create_redis_client)]
+
 
 @router.post(
     "",
@@ -37,8 +43,7 @@ router = APIRouter(prefix="/optometrists", tags=["Optometrists"])
 )
 # creates a new optometrist.
 def create_optometrist(
-    payload: OptometristCreate,
-    db: DbSession,
+    payload: OptometristCreate, db: DbSession, redis_client: RedisClient
 ) -> Optometrist:
     """Create an optometrist."""
 
@@ -46,6 +51,11 @@ def create_optometrist(
 
     db.add(optometrist)
     db.commit()
+    # invalidate availability for the affected optometrist
+    invalidate_admin_availability(
+        redis_client,
+        optometrist_id=optometrist.id,
+    )
     db.refresh(optometrist)
 
     return optometrist
@@ -74,6 +84,7 @@ def assign_optometrist_to_clinic(
     optometrist_id: int,
     payload: OptometristClinicCreate,
     db: DbSession,
+    redis_client: RedisClient,
 ) -> OptometristClinic:
     """Assign an existing optometrist to an existing clinic."""
 
@@ -117,7 +128,11 @@ def assign_optometrist_to_clinic(
 
     db.add(assignment)
     db.commit()
-
+    # invalidate availability for the affected optometrist
+    invalidate_admin_availability(
+        redis_client,
+        optometrist_id=optometrist_id,
+    )
     return assignment
 
 
@@ -131,6 +146,7 @@ def update_optometrist(
     optometrist_id: int,
     payload: OptometristUpdate,
     db: DbSession,
+    redis_client: RedisClient,
 ) -> Optometrist:
     optometrist = db.get(Optometrist, optometrist_id)
 
@@ -141,6 +157,11 @@ def update_optometrist(
         setattr(optometrist, field, value)
 
     db.commit()
+    # invalidate availability for the affected optometrist
+    invalidate_admin_availability(
+        redis_client,
+        optometrist_id=optometrist_id,
+    )
     db.refresh(optometrist)
     return optometrist
 
@@ -152,8 +173,7 @@ def update_optometrist(
 )
 # deletes the optometrist record.
 def delete_optometrist(
-    optometrist_id: int,
-    db: DbSession,
+    optometrist_id: int, db: DbSession, redis_client: RedisClient
 ) -> Response:
     optometrist = db.get(Optometrist, optometrist_id)
 
@@ -171,4 +191,9 @@ def delete_optometrist(
         ) from exc
 
     db.commit()
+    # invalidate availability for the affected optometrist
+    invalidate_admin_availability(
+        redis_client,
+        optometrist_id=optometrist_id,
+    )
     return Response(status_code=204)

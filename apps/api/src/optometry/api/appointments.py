@@ -2,8 +2,10 @@
 
 from datetime import UTC, datetime
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
+from redis import Redis
 from sqlalchemy.orm import Session
 
 from optometry.auth.dependencies import get_current_patient
@@ -13,6 +15,8 @@ from optometry.booking.service import (
     get_appointment,
     list_appointments,
 )
+from optometry.cache.availability_cache import invalidate_availability
+from optometry.cache.redis_client import create_redis_client
 from optometry.db.models.appointment import Appointment
 from optometry.db.models.patient import Patient
 from optometry.db.session import get_db
@@ -34,24 +38,42 @@ DbSession = Annotated[Session, Depends(get_db)]
 CurrentPatient = Annotated[Patient, Depends(get_current_patient)]
 
 
+# provides redis for appointment cache invalidation
+def get_redis_client() -> Redis:
+    return create_redis_client()
+
+
+RedisClient = Annotated[Redis, Depends(get_redis_client)]
+TORONTO = ZoneInfo("America/Toronto")
+
+
 @router.post(
     "",
     response_model=AppointmentRead,
     status_code=201,
 )
-# creates a new booking.
 def create_booking(
     payload: AppointmentCreate,
     db: DbSession,
     patient: CurrentPatient,
+    redis_client: RedisClient,
 ) -> Appointment:
-    # create a new appointment tied to the currently authenticated patient.
-    return create_appointment(
+    # create and commit the appointment before invalidating availability
+    appointment = create_appointment(
         db,
         payload,
         patient_id=patient.id,
         now=datetime.now(UTC),
     )
+
+    # invalidate every service for this doctor and local appointment date
+    invalidate_availability(
+        client=redis_client,
+        optometrist_id=appointment.optometrist_id,
+        appointment_date=appointment.start_at.astimezone(TORONTO).date(),
+    )
+
+    return appointment
 
 
 @router.get("", response_model=list[AppointmentRead])
@@ -95,16 +117,25 @@ def get_booking(
     "/{appointment_id}/cancel",
     response_model=AppointmentRead,
 )
-# cancels the booking record.
 def cancel_booking(
     appointment_id: int,
     db: DbSession,
     patient: CurrentPatient,
+    redis_client: RedisClient,
 ) -> Appointment:
-    # cancel a patient-owned appointment and persist the current UTC timestamp.
-    return cancel_appointment(
+    # commit the cancellation before invalidating availability
+    appointment = cancel_appointment(
         db,
         appointment_id,
         patient_id=patient.id,
         now=datetime.now(UTC),
     )
+
+    # invalidate the affected doctor and appointment date
+    invalidate_availability(
+        client=redis_client,
+        optometrist_id=appointment.optometrist_id,
+        appointment_date=appointment.start_at.astimezone(TORONTO).date(),
+    )
+
+    return appointment

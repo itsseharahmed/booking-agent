@@ -3,11 +3,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from redis import Redis
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from optometry.auth.admin_dependencies import get_current_admin
+from optometry.cache.admin_invalidation import invalidate_admin_availability
+from optometry.cache.redis_client import create_redis_client
 from optometry.db.models.optometrist_clinic import OptometristClinic
 from optometry.db.models.working_schedule import WorkingSchedule
 from optometry.db.session import get_db
@@ -23,6 +26,9 @@ DbSession = Annotated[Session, Depends(get_db)]
 # router for this api module.
 router = APIRouter(prefix="/schedules", tags=["Schedules"])
 
+# provides redis for administrative cache invalidation
+RedisClient = Annotated[Redis, Depends(create_redis_client)]
+
 
 @router.post(
     "",
@@ -32,8 +38,7 @@ router = APIRouter(prefix="/schedules", tags=["Schedules"])
 )
 # creates a new schedule.
 def create_schedule(
-    payload: WorkingScheduleCreate,
-    db: DbSession,
+    payload: WorkingScheduleCreate, db: DbSession, redis_client: RedisClient
 ) -> WorkingSchedule:
     """Create a weekly shift at an assigned clinic."""
 
@@ -54,13 +59,18 @@ def create_schedule(
 
     try:
         db.commit()
+
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
             status_code=409,
             detail="Schedule conflicts with an existing shift",
         ) from exc
-
+    # invalidate availability for the doctor's schedules
+    invalidate_admin_availability(
+        redis_client,
+        optometrist_id=schedule.optometrist_id,
+    )
     db.refresh(schedule)
 
     return schedule
@@ -106,6 +116,7 @@ def update_schedule(
     schedule_id: int,
     payload: WorkingScheduleUpdate,
     db: DbSession,
+    redis_client: RedisClient,
 ) -> WorkingSchedule:
     """Update a shift while preserving scheduling constraints."""
 
@@ -146,13 +157,18 @@ def update_schedule(
 
     try:
         db.commit()
+
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
             status_code=409,
             detail="Schedule conflicts with an existing shift",
         ) from exc
-
+    # invalidate availability for the doctor's schedules
+    invalidate_admin_availability(
+        redis_client,
+        optometrist_id=schedule.optometrist_id,
+    )
     db.refresh(schedule)
     return schedule
 
@@ -164,8 +180,7 @@ def update_schedule(
 )
 # deletes the schedule record.
 def delete_schedule(
-    schedule_id: int,
-    db: DbSession,
+    schedule_id: int, db: DbSession, redis_client: RedisClient
 ) -> Response:
     schedule = db.get(WorkingSchedule, schedule_id)
 
@@ -177,5 +192,10 @@ def delete_schedule(
 
     db.delete(schedule)
     db.commit()
+    # invalidate availability for the doctor's schedules
+    invalidate_admin_availability(
+        redis_client,
+        optometrist_id=schedule.optometrist_id,
+    )
 
     return Response(status_code=204)

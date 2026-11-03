@@ -5,10 +5,11 @@ from collections.abc import Generator
 
 import pytest
 from dotenv import load_dotenv
+from redis import Redis
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from optometry.core.config import PROJECT_ROOT, get_jwt_secret_key
+from optometry.core.config import PROJECT_ROOT, get_jwt_secret_key, get_test_redis_url
 from optometry.core.security import create_admin_access_token, hash_password
 from optometry.db.models.admin import Admin
 from tests.database_safety import validate_test_database_name
@@ -103,3 +104,25 @@ def admin_auth_headers(
     )
 
     return {"Authorization": f"Bearer {token}"}
+
+
+# provides an isolated redis client for integration tests
+@pytest.fixture
+def test_redis() -> Generator[Redis, None, None]:
+    client = Redis.from_url(
+        get_test_redis_url(),
+        decode_responses=True,
+        socket_connect_timeout=1,
+        socket_timeout=1,
+    )
+
+    if client.connection_pool.connection_kwargs.get("db") != 1:
+        pytest.fail("Tests must use Redis database 1")
+
+    try:
+        client.ping()
+        client.flushdb()
+        yield client
+    finally:
+        client.flushdb()
+        client.close()
