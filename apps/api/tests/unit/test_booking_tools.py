@@ -4,20 +4,27 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi import HTTPException
-from pydantic import ValidationError
+from test_confirmation_tools import FakeRedis
 
 from optometry.agent.tools.booking import (
     create_booking_tool,
     fetch_book_appointment,
 )
+from optometry.agent.tools.confirmation import (
+    BookingDetails,
+    confirm_request,
+    prepare_confirmation,
+)
 
 
-# checks successful appointment booking
+# checks successful booking and cache invalidation
 def test_fetch_book_appointment() -> None:
     db = MagicMock()
+    redis_client = MagicMock()
     start = datetime(2026, 11, 10, 15, 0, tzinfo=UTC)
     end = start + timedelta(minutes=20)
 
@@ -32,10 +39,15 @@ def test_fetch_book_appointment() -> None:
         status="booked",
     )
 
-    with patch(
-        "optometry.agent.tools.booking.create_appointment",
-        return_value=appointment,
-    ) as mock_create:
+    with (
+        patch(
+            "optometry.agent.tools.booking.create_appointment",
+            return_value=appointment,
+        ) as mock_create,
+        patch(
+            "optometry.agent.tools.booking.invalidate_availability"
+        ) as mock_invalidate,
+    ):
         result = fetch_book_appointment(
             db=db,
             patient_id=7,
@@ -44,6 +56,7 @@ def test_fetch_book_appointment() -> None:
             service_id=3,
             start_at=start,
             now=datetime(2026, 11, 4, tzinfo=UTC),
+            redis_client=redis_client,
         )
 
     assert result["appointment_id"] == 42
@@ -51,15 +64,26 @@ def test_fetch_book_appointment() -> None:
     assert result["appointment_price"] == "95.00"
     assert mock_create.call_args.kwargs["patient_id"] == 7
 
+    mock_invalidate.assert_called_once_with(
+        client=redis_client,
+        optometrist_id=2,
+        appointment_date=start.astimezone(ZoneInfo("America/Toronto")).date(),
+    )
 
-# checks booking conflicts
+
+# checks booking conflicts do not invalidate cache
 def test_fetch_book_appointment_conflict() -> None:
-    with patch(
-        "optometry.agent.tools.booking.create_appointment",
-        side_effect=HTTPException(
-            status_code=409,
-            detail="Appointment slot is already booked",
+    with (
+        patch(
+            "optometry.agent.tools.booking.create_appointment",
+            side_effect=HTTPException(
+                status_code=409,
+                detail="Appointment slot is already booked",
+            ),
         ),
+        patch(
+            "optometry.agent.tools.booking.invalidate_availability"
+        ) as mock_invalidate,
     ):
         result = fetch_book_appointment(
             db=MagicMock(),
@@ -69,32 +93,69 @@ def test_fetch_book_appointment_conflict() -> None:
             service_id=3,
             start_at=datetime(2026, 11, 10, tzinfo=UTC),
             now=datetime(2026, 11, 4, tzinfo=UTC),
+            redis_client=MagicMock(),
         )
 
     assert result == {
         "error": "Appointment slot is already booked",
         "status_code": 409,
     }
+    mock_invalidate.assert_not_called()
 
 
-# checks that unconfirmed bookings are blocked
+# checks confirmation token is required
 def test_booking_requires_confirmation() -> None:
-    with pytest.raises(ValueError, match="confirmation"):
-        create_booking_tool(patient_id=7, confirmed=False)
+    with pytest.raises(ValueError, match="confirmation token"):
+        create_booking_tool(
+            patient_id=7,
+            confirmation_token="",
+        )
 
 
-# checks that invalid patient ids are blocked
+# checks authenticated patient is required
 def test_booking_requires_authenticated_patient() -> None:
     with pytest.raises(ValueError, match="authenticated patient"):
-        create_booking_tool(patient_id=0, confirmed=True)
+        create_booking_tool(
+            patient_id=0,
+            confirmation_token="test-token",
+        )
 
 
-# checks the tool books for the trusted patient
+# checks the tool books only approved details
 def test_booking_tool_execution() -> None:
-    expected = {"appointment_id": 42, "status": "booked"}
-    start = "2026-11-10T15:00:00+00:00"
+    redis_client = FakeRedis()
+    start = datetime(2026, 11, 10, 15, 0, tzinfo=UTC)
+
+    details = BookingDetails(
+        clinic_id=1,
+        optometrist_id=2,
+        service_id=3,
+        start_at=start,
+    )
+
+    token = prepare_confirmation(
+        client=redis_client,
+        patient_id=7,
+        action="book",
+        details=details,
+    )
+
+    assert confirm_request(
+        client=redis_client,
+        patient_id=7,
+        token=token,
+    )
+
+    expected = {
+        "appointment_id": 42,
+        "status": "booked",
+    }
 
     with (
+        patch(
+            "optometry.agent.tools.booking.create_redis_client",
+            return_value=redis_client,
+        ),
         patch("optometry.agent.tools.booking.SessionLocal") as mock_session,
         patch(
             "optometry.agent.tools.booking.fetch_book_appointment",
@@ -103,48 +164,29 @@ def test_booking_tool_execution() -> None:
     ):
         booking_tool = create_booking_tool(
             patient_id=7,
-            confirmed=True,
+            confirmation_token=token,
         )
 
-        result = booking_tool.invoke(
-            {
-                "clinic_id": 1,
-                "optometrist_id": 2,
-                "service_id": 3,
-                "start_at": start,
-            }
-        )
+        result = booking_tool.invoke({})
+
+        with pytest.raises(PermissionError):
+            booking_tool.invoke({})
 
     assert result == expected
     assert mock_fetch.call_args.kwargs["patient_id"] == 7
-    assert mock_fetch.call_args.kwargs["start_at"] == datetime.fromisoformat(start)
+    assert mock_fetch.call_args.kwargs["clinic_id"] == 1
+    assert mock_fetch.call_args.kwargs["optometrist_id"] == 2
+    assert mock_fetch.call_args.kwargs["service_id"] == 3
+    assert mock_fetch.call_args.kwargs["start_at"] == start
+    mock_fetch.assert_called_once()
     mock_session.assert_called_once_with()
 
 
-# checks that the llm cannot supply a patient id
-def test_booking_schema_excludes_patient_id() -> None:
+# checks the llm cannot change approved details
+def test_booking_schema_excludes_patient_supplied_values() -> None:
     booking_tool = create_booking_tool(
         patient_id=7,
-        confirmed=True,
+        confirmation_token="test-token",
     )
 
-    assert "patient_id" not in booking_tool.args
-    assert "confirmed" not in booking_tool.args
-
-
-# checks invalid clinic ids are rejected
-def test_booking_rejects_invalid_clinic_id() -> None:
-    booking_tool = create_booking_tool(
-        patient_id=7,
-        confirmed=True,
-    )
-
-    with pytest.raises(ValidationError):
-        booking_tool.invoke(
-            {
-                "clinic_id": -1,
-                "optometrist_id": 2,
-                "service_id": 3,
-                "start_at": "2026-11-10T15:00:00+00:00",
-            }
-        )
+    assert booking_tool.args == {}
