@@ -1,30 +1,104 @@
-
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("App", () => {
-  it("displays the application heading", () => {
-    // Arrange: render the React component.
+  it("shows the authenticated booking interface", () => {
     render(<App />);
 
-    // Assert: patients should see the application title.
     expect(
-      screen.getByRole("heading", {
-        name: /optometry booking/i,
-      })
+      screen.getByRole("heading", { name: /optometry booking/i }),
     ).toBeInTheDocument();
+
+    expect(
+      screen.getByLabelText(/patient access token/i),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("button", { name: /send message/i }),
+    ).toBeDisabled();
   });
 
-  it("displays the development status", () => {
+  it("sends authenticated chat requests", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        conversation_id: "test-conversation",
+        response: "Which clinic would you prefer?",
+        proposal: null,
+      }),
+    });
+
+    vi.stubGlobal("fetch", mockFetch);
+
     render(<App />);
 
-     //screen.debug();
-    // The booking feature does not exist yet.
-    // We should not display a misleading booking form.
+    fireEvent.change(screen.getByLabelText(/patient access token/i), {
+      target: { value: "patient-test-token" },
+    });
+
+    fireEvent.change(screen.getByLabelText(/your message/i), {
+      target: { value: "I want an eye exam" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/which clinic would you prefer/i),
+      ).toBeInTheDocument();
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/agent/chat",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer patient-test-token",
+        }),
+      }),
+    );
+  });
+
+  it("cannot approve a proposal without backend validation", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        conversation_id: "test-conversation",
+        response: "Please review the cancellation.",
+        proposal: {
+          action: "cancel",
+          appointment_id: 42,
+          requires_confirmation: true,
+        },
+      }),
+    });
+
+    vi.stubGlobal("fetch", mockFetch);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText(/patient access token/i), {
+      target: { value: "patient-test-token" },
+    });
+
+    fireEvent.change(screen.getByLabelText(/your message/i), {
+      target: { value: "Cancel appointment 42" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+
     expect(
-      screen.getByText(/booking features coming soon/i)
+      await screen.findByRole("button", { name: /validate proposal/i }),
     ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", { name: /confirm cancellation/i }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
 # Booking operations and appointment validation.
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 from optometry.availability.service import get_availability
 from optometry.core.appointments import APPOINTMENT_DURATION_MINUTES
 from optometry.db.models.appointment import Appointment
+from optometry.db.models.clinic import Clinic
 from optometry.schemas.appointment import AppointmentCreate
 
 TORONTO = ZoneInfo("America/Toronto")
@@ -23,6 +25,7 @@ def create_appointment(
     *,
     patient_id: int,
     now: datetime,
+    expected_price: Decimal | None = None,
 ) -> Appointment:
     # timezone-aware input is required so comparisons and scheduling stay consistent.
     if payload.start_at.tzinfo is None or payload.start_at.utcoffset() is None:
@@ -44,6 +47,21 @@ def create_appointment(
     # determine the Toronto date used to find valid availability for that day.
     local_date = requested_start.astimezone(TORONTO).date()
 
+    # locks the clinic price for confirmed agent bookings
+    if expected_price is not None:
+        clinic = db.scalar(
+            select(Clinic)
+            .where(Clinic.id == payload.clinic_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+
+        if clinic is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Clinic not found",
+            )
+
     # ask the availability layer for the current price and candidate free slots.
     price, slots = get_availability(
         db=db,
@@ -53,6 +71,13 @@ def create_appointment(
         appointment_date=local_date,
         now=now,
     )
+
+    # rejects any difference from the patient's approved price
+    if expected_price is not None and price != expected_price:
+        raise HTTPException(
+            status_code=409,
+            detail="Appointment price changed. New confirmation required.",
+        )
 
     # find the exact slot that matches the requested appointment start time.
     matching_slot = next(

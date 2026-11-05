@@ -1,6 +1,7 @@
 """LangChain tool for confirmed appointment booking."""
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -10,6 +11,7 @@ from redis import Redis
 from sqlalchemy.orm import Session
 
 from optometry.agent.tools.confirmation import BookingDetails, consume_confirmation
+from optometry.availability.service import get_availability
 from optometry.booking.service import create_appointment
 from optometry.cache.availability_cache import invalidate_availability
 from optometry.cache.redis_client import create_redis_client
@@ -29,6 +31,7 @@ def fetch_book_appointment(
     start_at: datetime,
     now: datetime,
     redis_client: Redis | None = None,
+    expected_price: Decimal | None = None,
 ) -> dict[str, Any]:
     payload = AppointmentCreate(
         clinic_id=clinic_id,
@@ -38,7 +41,13 @@ def fetch_book_appointment(
     )
 
     try:
-        appointment = create_appointment(db, payload, patient_id=patient_id, now=now)
+        appointment = create_appointment(
+            db,
+            payload,
+            patient_id=patient_id,
+            now=now,
+            expected_price=expected_price,
+        )
     except HTTPException as exc:
         return {"error": str(exc.detail), "status_code": exc.status_code}
 
@@ -82,6 +91,30 @@ def create_booking_tool(*, patient_id: int, confirmation_token: str) -> BaseTool
                 raise PermissionError("Wrong confirmation action")
 
             with SessionLocal() as db:
+                now = datetime.now(UTC)
+
+                price, slots = get_availability(
+                    db=db,
+                    clinic_id=approved.clinic_id,
+                    optometrist_id=approved.optometrist_id,
+                    service_id=approved.service_id,
+                    appointment_date=approved.start_at.astimezone(TORONTO).date(),
+                    now=now,
+                )
+
+                if Decimal(price) != approved.appointment_price:
+                    return {
+                        "error": "Appointment price changed. New confirmation required.",
+                        "status_code": 409,
+                    }
+
+                if not any(
+                    slot.start.astimezone(UTC) == approved.start_at for slot in slots
+                ):
+                    return {
+                        "error": "Appointment is no longer available.",
+                        "status_code": 409,
+                    }
                 return fetch_book_appointment(
                     db=db,
                     patient_id=patient_id,
@@ -89,8 +122,9 @@ def create_booking_tool(*, patient_id: int, confirmation_token: str) -> BaseTool
                     optometrist_id=approved.optometrist_id,
                     service_id=approved.service_id,
                     start_at=approved.start_at,
-                    now=datetime.now(UTC),
+                    now=now,
                     redis_client=redis_client,
+                    expected_price=approved.appointment_price,
                 )
 
     return StructuredTool.from_function(

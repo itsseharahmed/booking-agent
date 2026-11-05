@@ -7,6 +7,12 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from optometry.api.agent_confirmations import (
+    get_confirmation_redis,
+)
+from optometry.api.agent_confirmations import (
+    router as agent_confirmations_router,
+)
 from optometry.api.appointments import get_redis_client as get_appointments_redis
 from optometry.api.appointments import router as appointments_router
 from optometry.api.availability import get_redis_client as get_availability_redis
@@ -808,3 +814,135 @@ def test_invalidation_during_availability_calculation(
     # the outdated cache version must not be stored
     keys = list(test_redis.scan_iter(match="availability:v3:*"))
     assert keys == []
+
+
+# checks real agent booking and cancellation in postgresql
+def test_agent_confirmation_booking_cancellation_end_to_end(
+    client,
+    test_session,
+    test_redis,
+    booking_data,
+) -> None:
+    # register the authenticated agent confirmation routes
+    client.app.include_router(agent_confirmations_router)
+    client.app.dependency_overrides[get_confirmation_redis] = lambda: test_redis
+
+    slot = first_available_slot(client, booking_data)
+
+    # prepare booking using actual availability validation
+    prepared = client.post(
+        "/agent/confirmations/prepare",
+        json={
+            "action": "book",
+            "clinic_id": booking_data["clinic_id"],
+            "optometrist_id": booking_data["optometrist_id"],
+            "service_id": booking_data["service_id"],
+            "start_at": slot["start"],
+            "requires_confirmation": True,
+        },
+    )
+
+    assert prepared.status_code == 200, prepared.text
+
+    booking_confirmation = prepared.json()
+    assert booking_confirmation["action"] == "book"
+    assert Decimal(booking_confirmation["details"]["appointment_price"]) == Decimal(
+        "95.00"
+    )
+
+    booking_token = booking_confirmation["confirmation_token"]
+
+    # explicitly approve the exact booking
+    approved = client.post(f"/agent/confirmations/{booking_token}/approve")
+    assert approved.status_code == 200
+
+    # execute the approved booking against postgresql
+    booked = client.post(f"/agent/confirmations/{booking_token}/execute/book")
+    assert booked.status_code == 200, booked.text
+
+    booking_result = booked.json()
+    appointment_id = booking_result["appointment_id"]
+
+    assert booking_result["status"] == "booked"
+    assert Decimal(booking_result["appointment_price"]) == Decimal("95.00")
+
+    # verify the actual persisted database record
+    test_session.expire_all()
+    appointment = test_session.get(Appointment, appointment_id)
+
+    assert appointment is not None
+    assert appointment.status == "booked"
+    assert appointment.patient_id is not None
+    assert appointment.clinic_id == booking_data["clinic_id"]
+    assert appointment.optometrist_id == booking_data["optometrist_id"]
+    assert appointment.service_id == booking_data["service_id"]
+    assert appointment.start_at == datetime.fromisoformat(slot["start"])
+    assert appointment.appointment_price == Decimal("95.00")
+
+    # verify the slot disappears from availability
+    availability_after_booking = client.get(
+        "/availability",
+        params=availability_params(booking_data),
+    )
+
+    assert availability_after_booking.status_code == 200
+    assert slot["start"] not in {
+        item["start"] for item in availability_after_booking.json()["slots"]
+    }
+
+    # prepare cancellation for the authenticated patient
+    cancel_prepared = client.post(
+        "/agent/confirmations/prepare",
+        json={
+            "action": "cancel",
+            "appointment_id": appointment_id,
+            "requires_confirmation": True,
+        },
+    )
+
+    assert cancel_prepared.status_code == 200, cancel_prepared.text
+
+    cancellation_token = cancel_prepared.json()["confirmation_token"]
+
+    # approve the exact appointment cancellation
+    cancel_approved = client.post(f"/agent/confirmations/{cancellation_token}/approve")
+    assert cancel_approved.status_code == 200
+
+    # execute cancellation against postgresql
+    cancelled = client.post(f"/agent/confirmations/{cancellation_token}/execute/cancel")
+
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["appointment_id"] == appointment_id
+    assert cancelled.json()["status"] == "cancelled"
+
+    # verify cancellation was persisted
+    test_session.expire_all()
+    updated = test_session.get(Appointment, appointment_id)
+
+    assert updated is not None
+    assert updated.status == "cancelled"
+    assert updated.cancelled_at is not None
+
+    # verify the slot is available again
+    availability_after_cancellation = client.get(
+        "/availability",
+        params=availability_params(booking_data),
+    )
+
+    assert availability_after_cancellation.status_code == 200
+    assert slot["start"] in {
+        item["start"] for item in availability_after_cancellation.json()["slots"]
+    }
+
+    # confirm neither approval can be reused
+    assert (
+        client.post(f"/agent/confirmations/{booking_token}/execute/book").status_code
+        == 409
+    )
+
+    assert (
+        client.post(
+            f"/agent/confirmations/{cancellation_token}/execute/cancel"
+        ).status_code
+        == 409
+    )

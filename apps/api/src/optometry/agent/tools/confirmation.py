@@ -1,6 +1,7 @@
 """Atomic one-time confirmations for agent write operations."""
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from secrets import token_urlsafe
 from typing import Any, Literal, cast
 
@@ -76,6 +77,7 @@ class BookingDetails(BaseModel):
     optometrist_id: int = Field(gt=0)
     service_id: int = Field(gt=0)
     start_at: datetime
+    appointment_price: Decimal = Field(ge=0, max_digits=10, decimal_places=2)
 
 
 class CancellationDetails(BaseModel):

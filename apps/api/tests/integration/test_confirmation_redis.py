@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 from redis import Redis
@@ -17,7 +18,7 @@ from optometry.agent.tools.confirmation import (
 
 @pytest.fixture
 def redis_client() -> Redis:
-    #use a dedicated test database
+    # use a dedicated test database
     client = Redis(
         host="localhost",
         port=6379,
@@ -31,7 +32,7 @@ def redis_client() -> Redis:
     client.close()
 
 
-#checks real Redis executes the approval and consume scripts
+# checks real Redis executes the approval and consume scripts
 def test_redis_confirmation_lifecycle(redis_client: Redis) -> None:
     patient_id = 7
     appointment_id = 42
@@ -68,7 +69,7 @@ def test_redis_confirmation_lifecycle(redis_client: Redis) -> None:
         )
 
 
-#checks only one concurrent request can approve a token
+# checks only one concurrent request can approve a token
 def test_redis_concurrent_approval(redis_client: Redis) -> None:
     token = prepare_confirmation(
         client=redis_client,
@@ -91,7 +92,7 @@ def test_redis_concurrent_approval(redis_client: Redis) -> None:
     assert results.count(False) == 9
 
 
-#checks only one concurrent request can consume approval
+# checks only one concurrent request can consume approval
 def test_redis_concurrent_consumption(redis_client: Redis) -> None:
     token = prepare_confirmation(
         client=redis_client,
@@ -125,7 +126,7 @@ def test_redis_concurrent_consumption(redis_client: Redis) -> None:
     assert results.count(False) == 9
 
 
-#checks Redis rejects wrong-patient confirmation
+# checks Redis rejects wrong-patient confirmation
 def test_redis_rejects_wrong_patient(redis_client: Redis) -> None:
     token = prepare_confirmation(
         client=redis_client,
@@ -164,7 +165,7 @@ def test_redis_rejects_wrong_patient(redis_client: Redis) -> None:
     assert isinstance(approved, CancellationDetails)
 
 
-#checks Redis rejects using cancellation approval for booking
+# checks Redis rejects using cancellation approval for booking
 def test_redis_rejects_wrong_action(redis_client: Redis) -> None:
     token = prepare_confirmation(
         client=redis_client,
@@ -197,7 +198,7 @@ def test_redis_rejects_wrong_action(redis_client: Redis) -> None:
     assert isinstance(approved, CancellationDetails)
 
 
-#checks booking details survive serialization
+# checks booking details survive serialization
 def test_redis_booking_details(redis_client: Redis) -> None:
     start = datetime.now(UTC) + timedelta(days=7)
 
@@ -210,6 +211,7 @@ def test_redis_booking_details(redis_client: Redis) -> None:
             optometrist_id=2,
             service_id=3,
             start_at=start,
+            appointment_price=Decimal("95.00"),
         ),
     )
 
@@ -231,3 +233,4 @@ def test_redis_booking_details(redis_client: Redis) -> None:
     assert approved.optometrist_id == 2
     assert approved.service_id == 3
     assert approved.start_at == start
+    assert approved.appointment_price == Decimal("95.00")

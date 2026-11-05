@@ -3,6 +3,7 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
+from decimal import Decimal
 from threading import Lock
 from typing import Any, Self
 
@@ -114,6 +115,7 @@ def test_booking_confirmation_is_single_use() -> None:
         optometrist_id=2,
         service_id=3,
         start_at=datetime(2026, 11, 10, 15, tzinfo=UTC),
+        appointment_price=Decimal("95.00"),
     )
 
     token = prepare_confirmation(
@@ -276,6 +278,7 @@ def test_booking_confirmation_rejects_naive_datetime() -> None:
         optometrist_id=2,
         service_id=3,
         start_at=datetime(2026, 11, 10, 15),
+        appointment_price=Decimal("95.00"),
     )
 
     with pytest.raises(ValueError, match="timezone"):

@@ -13,6 +13,8 @@ dependencies = [
     "redis>=5,<7",                  #for caching
     "groq>=0.30,<2",                #llm 
     "langchain-core>=1,<2",         #langchain tool
+    "langgraph>=1,<2",
+    "langchain-groq>=1,<2",
 ]
 
 [project.optional-dependencies]

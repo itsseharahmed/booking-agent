@@ -3,6 +3,8 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from optometry.agent.tools.optometrists import (
     fetch_active_optometrists,
     list_active_optometrists,
@@ -13,32 +15,19 @@ from optometry.agent.tools.services import (
 )
 
 
-# checks inactive optometrists are excluded
+# checks clinic-specific optometrist lookup
 def test_fetch_active_optometrists() -> None:
     db = MagicMock()
 
-    doctors = [
-        SimpleNamespace(
-            id=1,
-            first_name="Jane",
-            last_name="Smith",
-            is_active=True,
-        ),
-        SimpleNamespace(
-            id=2,
-            first_name="John",
-            last_name="Doe",
-            is_active=False,
-        ),
-    ]
+    doctor = SimpleNamespace(
+        id=1,
+        first_name="Jane",
+        last_name="Smith",
+    )
 
-    with patch(
-        "optometry.agent.tools.optometrists.fetch_optometrists",
-        return_value=doctors,
-    ) as mock_fetch:
-        result = fetch_active_optometrists(db)
+    db.scalars.return_value.all.return_value = [doctor]
 
-    mock_fetch.assert_called_once_with(db=db)
+    result = fetch_active_optometrists(db, clinic_id=3)
 
     assert result == [
         {
@@ -48,10 +37,26 @@ def test_fetch_active_optometrists() -> None:
         }
     ]
 
+    db.scalars.assert_called_once()
 
-# checks optometrist tool execution
+    statement = db.scalars.call_args.args[0]
+    sql = str(statement.compile())
+
+    assert "optometrist_clinics" in sql
+    assert "clinics" in sql
+    assert "is_active" in sql
+    assert "clinic_id" in sql or "clinics.id" in sql
+
+
+# checks tool execution with clinic id
 def test_list_active_optometrists() -> None:
-    expected = [{"id": 1, "first_name": "Jane", "last_name": "Smith"}]
+    expected = [
+        {
+            "id": 1,
+            "first_name": "Jane",
+            "last_name": "Smith",
+        }
+    ]
 
     with (
         patch("optometry.agent.tools.optometrists.SessionLocal") as mock_session,
@@ -60,11 +65,16 @@ def test_list_active_optometrists() -> None:
             return_value=expected,
         ) as mock_fetch,
     ):
-        result = list_active_optometrists.invoke({})
+        result = list_active_optometrists.invoke({"clinic_id": 3})
 
     assert result == expected
+
     mock_session.assert_called_once_with()
-    mock_fetch.assert_called_once_with(mock_session.return_value.__enter__.return_value)
+
+    mock_fetch.assert_called_once_with(
+        mock_session.return_value.__enter__.return_value,
+        3,
+    )
 
 
 # checks active service filtering
@@ -104,3 +114,19 @@ def test_list_active_services() -> None:
     assert result == expected
     mock_session.assert_called_once_with()
     mock_fetch.assert_called_once_with(mock_session.return_value.__enter__.return_value)
+
+
+# checks invalid clinic ids are rejected
+def test_fetch_active_optometrists_rejects_invalid_clinic() -> None:
+    with pytest.raises(ValueError, match="valid clinic ID"):
+        fetch_active_optometrists(MagicMock(), clinic_id=0)
+
+
+# checks lookup returns empty list when no doctors match
+def test_fetch_active_optometrists_no_results() -> None:
+    db = MagicMock()
+    db.scalars.return_value.all.return_value = []
+
+    result = fetch_active_optometrists(db, clinic_id=3)
+
+    assert result == []

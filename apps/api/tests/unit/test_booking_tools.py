@@ -131,6 +131,7 @@ def test_booking_tool_execution() -> None:
         optometrist_id=2,
         service_id=3,
         start_at=start,
+        appointment_price=Decimal("95.00"),
     )
 
     token = prepare_confirmation(
@@ -161,6 +162,17 @@ def test_booking_tool_execution() -> None:
             "optometry.agent.tools.booking.fetch_book_appointment",
             return_value=expected,
         ) as mock_fetch,
+        patch(
+            "optometry.agent.tools.booking.get_availability",
+            return_value=(
+                Decimal("95.00"),
+                [
+                    SimpleNamespace(
+                        start=start,
+                    )
+                ],
+            ),
+        ),
     ):
         booking_tool = create_booking_tool(
             patient_id=7,
@@ -190,3 +202,74 @@ def test_booking_schema_excludes_patient_supplied_values() -> None:
     )
 
     assert booking_tool.args == {}
+
+
+# checks booking approval includes an exact price
+def test_booking_details_preserve_price() -> None:
+    details = BookingDetails(
+        clinic_id=1,
+        optometrist_id=2,
+        service_id=3,
+        start_at=datetime(2026, 11, 10, 15, tzinfo=UTC),
+        appointment_price=Decimal("95.00"),
+    )
+
+    restored = BookingDetails.model_validate_json(details.model_dump_json())
+
+    assert restored.appointment_price == Decimal("95.00")
+
+
+# checks changed price prevents booking
+def test_booking_rejects_changed_price() -> None:
+    redis_client = FakeRedis()
+    start = datetime(2026, 11, 10, 15, tzinfo=UTC)
+
+    token = prepare_confirmation(
+        client=redis_client,
+        patient_id=7,
+        action="book",
+        details=BookingDetails(
+            clinic_id=1,
+            optometrist_id=2,
+            service_id=3,
+            start_at=start,
+            appointment_price=Decimal("95.00"),
+        ),
+    )
+
+    assert confirm_request(
+        client=redis_client,
+        patient_id=7,
+        token=token,
+    )
+
+    with (
+        patch(
+            "optometry.agent.tools.booking.create_redis_client",
+            return_value=redis_client,
+        ),
+        patch("optometry.agent.tools.booking.SessionLocal"),
+        patch(
+            "optometry.agent.tools.booking.get_availability",
+            return_value=(
+                Decimal("110.00"),
+                [SimpleNamespace(start=start)],
+            ),
+        ),
+        patch(
+            "optometry.agent.tools.booking.fetch_book_appointment",
+        ) as mock_fetch,
+    ):
+        booking_tool = create_booking_tool(
+            patient_id=7,
+            confirmation_token=token,
+        )
+
+        result = booking_tool.invoke({})
+
+    assert result == {
+        "error": "Appointment price changed. New confirmation required.",
+        "status_code": 409,
+    }
+
+    mock_fetch.assert_not_called()
