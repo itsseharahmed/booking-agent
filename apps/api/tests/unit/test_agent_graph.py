@@ -33,7 +33,7 @@ def test_graph_direct_response() -> None:
 
     registered_tools = model.bind_tools.call_args.args[0]
 
-    assert len(registered_tools) == 6
+    assert len(registered_tools) == 7
     assert "book_appointment" not in {tool.name for tool in registered_tools}
     assert "cancel_appointment" not in {tool.name for tool in registered_tools}
 
@@ -120,4 +120,78 @@ def test_graph_handles_repeated_empty_responses() -> None:
     result = graph.invoke({"messages": [HumanMessage(content="Find appointments")]})
 
     assert "couldn't complete" in result["messages"][-1].content
+    assert bound_model.invoke.call_count == 2
+
+
+# checks clinic knowledge is available to the model
+def test_graph_registers_clinic_knowledge_tool() -> None:
+    model = MagicMock()
+    bound_model = MagicMock()
+
+    model.bind_tools.return_value = bound_model
+    bound_model.invoke.return_value = AIMessage(
+        content="I can check the clinic's insurance information."
+    )
+
+    graph = build_read_only_graph(model)
+
+    result = graph.invoke(
+        {"messages": [HumanMessage(content="Does test clinic accept Sun Life?")]}
+    )
+
+    registered_tools = model.bind_tools.call_args.args[0]
+
+    assert "get_clinic_knowledge" in {
+        registered_tool.name for registered_tool in registered_tools
+    }
+
+    assert result["messages"][-1].content == (
+        "I can check the clinic's insurance information."
+    )
+
+
+# checks LangGraph executes a clinic knowledge tool call
+def test_graph_executes_clinic_knowledge_tool(
+    monkeypatch,
+) -> None:
+    from optometry.agent.tools.clinic_knowledge import (
+        get_clinic_knowledge,
+    )
+
+    monkeypatch.setattr(
+        get_clinic_knowledge,
+        "func",
+        lambda clinic_id: {
+            "clinic_id": clinic_id,
+            "name": "Test Clinic",
+            "insurance_info": "Sun Life accepted",
+        },
+    )
+
+    model = MagicMock()
+    bound_model = MagicMock()
+    model.bind_tools.return_value = bound_model
+
+    bound_model.invoke.side_effect = [
+        AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "get_clinic_knowledge",
+                    "args": {"clinic_id": 1},
+                    "id": "clinic-knowledge-call",
+                    "type": "tool_call",
+                }
+            ],
+        ),
+        AIMessage(content="Test Clinic accepts Sun Life insurance."),
+    ]
+
+    graph = build_read_only_graph(model)
+
+    result = graph.invoke(
+        {"messages": [HumanMessage(content="Does test clinic accept Sun Life?")]}
+    )
+
+    assert result["messages"][-1].content == ("Test Clinic accepts Sun Life insurance.")
     assert bound_model.invoke.call_count == 2

@@ -3,6 +3,7 @@
 from langchain_core.tools import BaseTool
 
 from optometry.agent.tools.availability import check_appointment_availability
+from optometry.agent.tools.clinic_knowledge import get_clinic_knowledge
 from optometry.agent.tools.clinics import list_active_clinics
 from optometry.agent.tools.optometrists import list_active_optometrists
 from optometry.agent.tools.planning import (
@@ -21,4 +22,5 @@ def get_read_only_tools() -> list[BaseTool]:
         check_appointment_availability,
         propose_booking,
         propose_cancellation,
+        get_clinic_knowledge,
     ]
